@@ -1,0 +1,356 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 63;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01B46FDE597C2E956994B480 /* BrightnessControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA0B55DF740453FDE55E502 /* BrightnessControlApp.swift */; };
+		052F784EB5F092029CC1B4C4 /* ScreenResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CDB7EDCA7E60F90833C89B6 /* ScreenResolver.swift */; };
+		71AA90CC27FEAA3E3DAB6B43 /* BrightnessRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F640722297F94E7AB0D43220 /* BrightnessRouter.swift */; };
+		7F693D74378E34062B4F3987 /* SerialPortService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3DF9850443EC5BDCC59A15 /* SerialPortService.swift */; };
+		9AAAB3EC6152553222B9FA5B /* KeyInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D08FC9E83DE6AB568F46417 /* KeyInterceptor.swift */; };
+		B80F9CE97B89AF4B9B69D6B9 /* CursorMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CA8F3691106678E67D31AB /* CursorMonitor.swift */; };
+		C35417F3730699CAD611BA90 /* ScreenType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B3F4F195670D9249C8B6536 /* ScreenType.swift */; };
+		C5ABB91B1688056BBFB8E33E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC50081F4374EDB36B3CD8B /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0D08FC9E83DE6AB568F46417 /* KeyInterceptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyInterceptor.swift; sourceTree = "<group>"; };
+		2FC50081F4374EDB36B3CD8B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		4D3DF9850443EC5BDCC59A15 /* SerialPortService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortService.swift; sourceTree = "<group>"; };
+		57CA8F3691106678E67D31AB /* CursorMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorMonitor.swift; sourceTree = "<group>"; };
+		6B3F4F195670D9249C8B6536 /* ScreenType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenType.swift; sourceTree = "<group>"; };
+		8CDB7EDCA7E60F90833C89B6 /* ScreenResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenResolver.swift; sourceTree = "<group>"; };
+		AC3993A5E3C942EB8F5BD3ED /* ViewFinity Brightness Control.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ViewFinity Brightness Control.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DBA0B55DF740453FDE55E502 /* BrightnessControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessControlApp.swift; sourceTree = "<group>"; };
+		F640722297F94E7AB0D43220 /* BrightnessRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessRouter.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0C8F8BEB0C61A1BA6A082A43 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				6B3F4F195670D9249C8B6536 /* ScreenType.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		34741B939D60655D5CF9D917 /* ViewFinityBrightnessControl */ = {
+			isa = PBXGroup;
+			children = (
+				92FF87EE3DE444CF334EBD7E /* App */,
+				0C8F8BEB0C61A1BA6A082A43 /* Models */,
+				F75F9CBFD1E1A5C4D8928C28 /* Services */,
+			);
+			path = ViewFinityBrightnessControl;
+			sourceTree = "<group>";
+		};
+		347A97BDB7756CC553646218 = {
+			isa = PBXGroup;
+			children = (
+				34741B939D60655D5CF9D917 /* ViewFinityBrightnessControl */,
+				DC45C3667142A31A83A5706F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		92FF87EE3DE444CF334EBD7E /* App */ = {
+			isa = PBXGroup;
+			children = (
+				DBA0B55DF740453FDE55E502 /* BrightnessControlApp.swift */,
+				2FC50081F4374EDB36B3CD8B /* SettingsView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		DC45C3667142A31A83A5706F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AC3993A5E3C942EB8F5BD3ED /* ViewFinity Brightness Control.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F75F9CBFD1E1A5C4D8928C28 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F640722297F94E7AB0D43220 /* BrightnessRouter.swift */,
+				57CA8F3691106678E67D31AB /* CursorMonitor.swift */,
+				0D08FC9E83DE6AB568F46417 /* KeyInterceptor.swift */,
+				8CDB7EDCA7E60F90833C89B6 /* ScreenResolver.swift */,
+				4D3DF9850443EC5BDCC59A15 /* SerialPortService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1B2E9B252E9AB2B84EE3B664 /* ViewFinityBrightnessControl */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D7B9705B23F8C5DB6D8A6EC /* Build configuration list for PBXNativeTarget "ViewFinityBrightnessControl" */;
+			buildPhases = (
+				39D89BB187E8B14719914CBE /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ViewFinityBrightnessControl;
+			packageProductDependencies = (
+			);
+			productName = ViewFinityBrightnessControl;
+			productReference = AC3993A5E3C942EB8F5BD3ED /* ViewFinity Brightness Control.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AD74C0D9016E7DBE3FB82FB6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					1B2E9B252E9AB2B84EE3B664 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 785C2A84A4C6FEB220A6D99F /* Build configuration list for PBXProject "ViewFinityBrightnessControl" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 347A97BDB7756CC553646218;
+			minimizedProjectReferenceProxies = 1;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1B2E9B252E9AB2B84EE3B664 /* ViewFinityBrightnessControl */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		39D89BB187E8B14719914CBE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01B46FDE597C2E956994B480 /* BrightnessControlApp.swift in Sources */,
+				71AA90CC27FEAA3E3DAB6B43 /* BrightnessRouter.swift in Sources */,
+				B80F9CE97B89AF4B9B69D6B9 /* CursorMonitor.swift in Sources */,
+				9AAAB3EC6152553222B9FA5B /* KeyInterceptor.swift in Sources */,
+				052F784EB5F092029CC1B4C4 /* ScreenResolver.swift in Sources */,
+				C35417F3730699CAD611BA90 /* ScreenType.swift in Sources */,
+				7F693D74378E34062B4F3987 /* SerialPortService.swift in Sources */,
+				C5ABB91B1688056BBFB8E33E /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		00E3FC152E92E274B8CA4897 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ViewFinityBrightnessControl/ViewFinityBrightnessControl.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_APP_SANDBOX = NO;
+				INFOPLIST_FILE = ViewFinityBrightnessControl/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.viewfinity.brightnesscontrol;
+				PRODUCT_NAME = "ViewFinity Brightness Control";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		2893528C5C43B7804E2BFF8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ViewFinityBrightnessControl/ViewFinityBrightnessControl.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_APP_SANDBOX = NO;
+				INFOPLIST_FILE = ViewFinityBrightnessControl/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.viewfinity.brightnesscontrol;
+				PRODUCT_NAME = "ViewFinity Brightness Control";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		371CF66147C137194B9CB3EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 2VR3GSRVVQ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		6F13633F53475FBF7B856275 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 2VR3GSRVVQ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4D7B9705B23F8C5DB6D8A6EC /* Build configuration list for PBXNativeTarget "ViewFinityBrightnessControl" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00E3FC152E92E274B8CA4897 /* Debug */,
+				2893528C5C43B7804E2BFF8E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		785C2A84A4C6FEB220A6D99F /* Build configuration list for PBXProject "ViewFinityBrightnessControl" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				371CF66147C137194B9CB3EF /* Debug */,
+				6F13633F53475FBF7B856275 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = AD74C0D9016E7DBE3FB82FB6 /* Project object */;
+}

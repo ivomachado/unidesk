@@ -1,0 +1,11 @@
+idf_component_register(
+    SRCS
+        "main.cpp"
+        "nvs_manager.cpp"
+        "ble_hid_service.cpp"
+        "brightness_control.cpp"
+        "usb_serial.cpp"
+        "command_handler.cpp"
+    INCLUDE_DIRS
+        "."
+)
