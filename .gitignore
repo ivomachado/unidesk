@@ -6,6 +6,8 @@ DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcuserstate
 
 # Xcode state
 *.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist

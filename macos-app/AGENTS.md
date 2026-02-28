@@ -1,0 +1,11 @@
+# macOS App — Agent Landmines
+
+- `CGEventMask` must not use `UInt64.max` or overly broad masks. It overflows the valid range and `CGEvent.tapCreate` silently drops all keyboard events. The correct mask is `(1 << keyDown) | (1 << NX_SYSDEFINED)`.
+- The event tap must be added to the **main run loop** (`CFRunLoopGetMain()`). Background thread run loops may not deliver keyboard events reliably.
+- Brightness keys arrive as `keyDown` events (type 10) with keycodes **144** (up) and **145** (down) on macOS Tahoe 26+. On earlier versions, they arrive as `NX_SYSDEFINED` (type 14, subtype 8) with `NX_KEYTYPE_BRIGHTNESS_UP` (2) / `NX_KEYTYPE_BRIGHTNESS_DOWN` (3). Both paths must be handled.
+- **DTR and RTS must be explicitly asserted** via `ioctl(TIOCSDTR)` and `ioctl(TIOCMBIS, TIOCM_RTS)` after every `open()` on the serial port. macOS may auto-assert DTR only on the first open after USB enumeration — subsequent opens (reconnects, wake) will silently fail without this.
+- Code signing must use a **stable identity** (`Apple Development`), not ad-hoc (`-`). Ad-hoc signing generates a new `cdhash` per build, causing macOS TCC to reset Accessibility permissions every rebuild.
+- App Sandbox is **intentionally disabled**. `CGEventTap` and POSIX serial I/O (`/dev/cu.*`) are incompatible with App Sandbox. Do not re-enable it.
+- `IODisplayConnect` EDID lookup returns no results on macOS Tahoe. Fall back to `NSScreen.localizedName` for display identification. The observed name for the 27″ ViewFinity S9 is `S27C900P`.
+- The `MenuBarExtra` label is a `Scene`, not a `View`. `@ObservedObject` does not trigger re-evaluation in a `Scene` body. Any reactive UI in the menu bar icon must be wrapped in a dedicated `View` struct with its own `@ObservedObject`.
+- The ESP32 USB-CDC buffers commands across sessions. On reconnect, the first write triggers a flood of stale responses. The handshake nonce (`0x04` + 4-char hex) solves this — discard all responses until the matching `OK:PING:<nonce>` arrives.
