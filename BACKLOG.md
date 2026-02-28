@@ -12,7 +12,7 @@ _(empty)_
 
 - **Brightness behavior setting:** Add a `UserDefaults`-backed setting (`brightnessBehavior`) with options: `cursorOnly` (default — swallow event when on S9), `alwaysBoth` (adjust both displays), `viewFinityOnly` (always send to ESP32, swallow native). Expose in `SettingsView` as a picker.
 
-- **Reconnect on brightness key press:** When the ESP32 is disconnected and a brightness key is pressed while the cursor is over the ViewFinity S9, trigger a background reconnection attempt instead of silently ignoring the key.
+
 
 - **Crash when connecting from Settings window:** Investigate crash when pressing "Connect" in the Settings window. Likely a re-entrant `connect()` call or threading race. Guard against concurrent connection attempts.
 
@@ -36,8 +36,8 @@ _(empty)_
 
 ## Done
 
-_(empty)_
+- **Reconnect on brightness key press:** `BrightnessRouter.sendSerialBrightness` now calls `connect()` when disconnected before sending the command.
 
 ## Won't Do
 
-_(empty)_
+- **Brightness step configuration (multi-step per keypress):** Implemented and tested a `UserDefaults`-backed setting (1–5 steps per keypress) that looped serial commands to the ESP32. The ViewFinity S9 monitor cannot reliably process rapid sequential HID brightness reports — it drops or misorders them. Reverted entirely. Any future attempt would need a firmware-side approach with inter-report delays, but the monitor's OSD latency makes this impractical.

@@ -164,13 +164,20 @@ final class BrightnessRouter: ObservableObject {
     // MARK: - Serial Brightness (ESP32)
 
     /// Sends the brightness command to the ESP32 via the serial bridge.
+    /// If the ESP32 is disconnected, attempts a background reconnection
+    /// and sends the command if the connection succeeds.
     private func sendSerialBrightness(action: BrightnessAction) {
-        guard serialPort.isConnected else {
-            logger.warning("ESP32 not connected — cannot send brightness command")
-            return
-        }
-
         Task {
+            if !serialPort.isConnected {
+                logger.info("ESP32 not connected — attempting reconnect before sending brightness command")
+                await serialPort.connect()
+            }
+
+            guard serialPort.isConnected else {
+                logger.warning("ESP32 reconnect failed — brightness command dropped")
+                return
+            }
+
             switch action {
             case .up:
                 await serialPort.brightnessUp()
