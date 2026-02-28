@@ -63,15 +63,28 @@ struct BrightnessControlApp: App {
                 keyInterceptor: appDelegate.keyInterceptor
             )
         } label: {
-            Image(systemName: menuBarIconName)
-                .symbolRenderingMode(.hierarchical)
+            MenuBarIcon(serialPort: appDelegate.serialPort)
         }
         .menuBarExtraStyle(.window)
     }
 
-    private var menuBarIconName: String {
-        if appDelegate.serialPort.isConnected {
-            return appDelegate.serialPort.bleConnected
+}
+
+/// A small helper View that properly subscribes to `SerialPortService` changes
+/// via `@ObservedObject`, ensuring the menu bar icon updates reactively.
+/// The `App.body` (a `Scene`) does not observe `ObservableObject` changes
+/// from `@NSApplicationDelegateAdaptor`, so a computed property there never triggers re-evaluation.
+struct MenuBarIcon: View {
+    @ObservedObject var serialPort: SerialPortService
+
+    var body: some View {
+        Image(systemName: iconName)
+            .symbolRenderingMode(.hierarchical)
+    }
+
+    private var iconName: String {
+        if serialPort.isConnected {
+            return serialPort.bleConnected
                 ? "display"
                 : "display.trianglebadge.exclamationmark"
         } else {
