@@ -97,8 +97,8 @@ See [PROTOCOL.md](../PROTOCOL.md) for the full serial communication specificatio
 
 | Command Byte | Action | Response |
 |-------------|--------|----------|
-| `0x01` | Brightness Up | `OK:UP\n` |
-| `0x02` | Brightness Down | `OK:DOWN\n` |
+| `0x01` | Brightness Up | _(none — fire-and-forget)_ |
+| `0x02` | Brightness Down | _(none — fire-and-forget)_ |
 | `0x03` | Enter Pairing Mode | `OK:PAIRING\n` |
 | `0x04` + nonce + `\n` | Handshake | `OK:PING:<nonce>\n` |
 | `0x05` | Get Status | `STATUS:<state>:<name>\n` |

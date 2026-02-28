@@ -23,8 +23,8 @@ Commands are single bytes, except for the handshake which includes a nonce.
 
 | Bytes                | Command            | Description                                          |
 |----------------------|--------------------|------------------------------------------------------|
-| `0x01`               | Brightness Up      | Send BLE HID brightness increment to paired monitor  |
-| `0x02`               | Brightness Down    | Send BLE HID brightness decrement to paired monitor  |
+| `0x01`               | Brightness Up      | Send BLE HID brightness increment to paired monitor (fire-and-forget — no response) |
+| `0x02`               | Brightness Down    | Send BLE HID brightness decrement to paired monitor (fire-and-forget — no response) |
 | `0x03`               | Enter Pairing Mode | Clear NVS bonds, restart BLE advertising             |
 | `0x04` `<nonce>` `\n` | Handshake / Ping   | Verify firmware is alive; nonce is echoed back        |
 | `0x05`               | Get Status         | Query BLE connection state and paired device name     |
@@ -49,12 +49,12 @@ All responses are **newline-terminated ASCII strings** prefixed by a tag (`OK`, 
 | Response                                    | After Command | Description                                                        |
 |---------------------------------------------|---------------|--------------------------------------------------------------------|
 | `OK:PING:<nonce>\n`                         | `0x04`        | Firmware is alive; `<nonce>` matches the hex string sent by host   |
-| `OK:UP\n`                                   | `0x01`        | Brightness-up HID report sent to monitor                           |
-| `OK:DOWN\n`                                 | `0x02`        | Brightness-down HID report sent to monitor                         |
+| _(none)_                                    | `0x01`        | Fire-and-forget — no response sent                                 |
+| _(none)_                                    | `0x02`        | Fire-and-forget — no response sent                                 |
 | `OK:PAIRING\n`                              | `0x03`        | NVS cleared, BLE advertising restarted in pairing mode             |
 | `OK:UNPAIRED\n`                             | `0x06`        | BLE bond cleared                                                   |
 | `STATUS:<connected\|disconnected>:<name>\n` | `0x05`        | BLE state and paired device name (empty string if none paired)     |
-| `ERR:<message>\n`                           | Any           | Human-readable error                                               |
+| `ERR:<message>\n`                           | Any (except `0x01`, `0x02`) | Human-readable error                                |
 
 ### Known Error Messages
 
