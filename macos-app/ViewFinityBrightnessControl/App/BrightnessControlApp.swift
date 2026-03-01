@@ -177,11 +177,6 @@ struct MenuBarContentView: View {
                         ? (serialPort.bleConnected ? "Connected" : "Disconnected")
                         : "—"
                 )
-
-                LabeledRow(
-                    label: "Paired Device",
-                    value: serialPort.pairedDeviceName.isEmpty ? "—" : serialPort.pairedDeviceName
-                )
             }
 
             // Current screen target
@@ -252,12 +247,14 @@ struct MenuBarContentView: View {
                     .buttonStyle(.borderless)
                 }
 
-                Button {
-                    Task { try? await serialPort.enterPairingMode() }
-                } label: {
-                    Label("Pair Monitor", systemImage: "antenna.radiowaves.left.and.right")
+                if !serialPort.bleConnected {
+                    Button {
+                        Task { try? await serialPort.enterPairingMode() }
+                    } label: {
+                        Label("Pair Monitor", systemImage: "antenna.radiowaves.left.and.right")
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.borderless)
 
                 Button {
                     Task { await serialPort.refreshStatus() }

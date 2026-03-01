@@ -125,7 +125,7 @@ struct SettingsView: View {
                             .frame(width: 8, height: 8)
 
                         if serialPort.bleConnected {
-                            Text("Paired: \(serialPort.pairedDeviceName.isEmpty ? "Unknown" : serialPort.pairedDeviceName)")
+                            Text("Monitor paired")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
@@ -136,14 +136,14 @@ struct SettingsView: View {
                     }
 
                     HStack(spacing: 8) {
-                        Button {
-                            performPairing()
-                        } label: {
-                            Label("Pair Monitor", systemImage: "link.badge.plus")
-                        }
-                        .disabled(!serialPort.isConnected || isPairing)
-
-                        if serialPort.bleConnected {
+                        if !serialPort.bleConnected {
+                            Button {
+                                performPairing()
+                            } label: {
+                                Label("Pair Monitor", systemImage: "link.badge.plus")
+                            }
+                            .disabled(!serialPort.isConnected || isPairing)
+                        } else {
                             Button(role: .destructive) {
                                 performUnpair()
                             } label: {

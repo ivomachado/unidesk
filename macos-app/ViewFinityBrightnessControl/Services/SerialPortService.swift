@@ -70,7 +70,6 @@ final class SerialPortService: ObservableObject {
     @Published private(set) var portPath: String?
     @Published private(set) var lastError: String?
     @Published private(set) var bleConnected: Bool = false
-    @Published private(set) var pairedDeviceName: String = ""
 
     // MARK: - Constants
 
@@ -260,7 +259,6 @@ final class SerialPortService: ObservableObject {
         portPath = nil
         lastError = nil
         bleConnected = false
-        pairedDeviceName = ""
     }
 
     /// Disconnects but preserves `lastError` so the UI can display the failure reason.
@@ -270,7 +268,6 @@ final class SerialPortService: ObservableObject {
         isConnected = false
         portPath = nil
         bleConnected = false
-        pairedDeviceName = ""
         lastError = savedError
     }
 
@@ -300,7 +297,6 @@ final class SerialPortService: ObservableObject {
         if case .ok(let tag) = response, tag == "PAIRING" {
             logger.info("Board entered pairing mode")
             bleConnected = false
-            pairedDeviceName = ""
         } else if case .error(let msg) = response {
             throw SerialError.deviceError(msg)
         }
@@ -312,7 +308,6 @@ final class SerialPortService: ObservableObject {
         if case .ok(let tag) = response, tag == "UNPAIRED" {
             logger.info("Bond cleared")
             bleConnected = false
-            pairedDeviceName = ""
         } else if case .error(let msg) = response {
             throw SerialError.deviceError(msg)
         }
@@ -325,8 +320,7 @@ final class SerialPortService: ObservableObject {
             let response = try await sendCommand(.getStatus)
             if case .status(let connected, let name) = response {
                 bleConnected = connected
-                pairedDeviceName = name
-                NSLog("[SerialPort] Status: BLE %@, device: '%@'", connected ? "connected" : "disconnected", name)
+                NSLog("[SerialPort] Status: BLE %@", connected ? "connected" : "disconnected")
             } else {
                 NSLog("[SerialPort] getStatus returned unexpected response: %@", String(describing: response))
             }
@@ -419,7 +413,7 @@ final class SerialPortService: ObservableObject {
         // If we didn't get a status (BLE state still default), retry once
         // after a brief delay — the first attempt may have been consumed by
         // stale data still being flushed from the ESP32.
-        if isConnected && !bleConnected && pairedDeviceName.isEmpty {
+        if isConnected && !bleConnected {
             NSLog("[SerialPort] Status may have failed — retrying after 500ms…")
             try? await Task.sleep(nanoseconds: 500_000_000)
             readBuffer.removeAll()
