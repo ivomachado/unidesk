@@ -17,6 +17,10 @@ public:
     static constexpr uint8_t CMD_SET_ESC_DEBOUNCE   = 0x07;
     static constexpr uint8_t CMD_GET_ESC_DEBOUNCE   = 0x08;
 
+    /// Sentinel byte posted to the RX queue by the read timeout timer callback.
+    /// Must not collide with any valid command byte (max valid is 0x08).
+    static constexpr uint8_t SENTINEL_TIMEOUT       = 0xFF;
+
     static CommandHandler& instance();
 
     /// Process a single byte received from USB serial.
@@ -40,8 +44,9 @@ private:
     /// Complete the set-ESC-debounce command with the 4 bytes accumulated.
     void complete_set_esc_debounce();
 
-    /// Timer callback for nonce read timeout.
-    static void nonce_timeout_cb(TimerHandle_t timer);
+    /// Timer callback for multi-byte read timeout (nonce and ESC debounce).
+    /// Posts SENTINEL_TIMEOUT to the RX queue so all state mutations stay on one task.
+    static void read_timeout_cb(TimerHandle_t timer);
 
     enum class State {
         IDLE,                  // Waiting for a command byte
@@ -53,8 +58,8 @@ private:
     std::string nonce_buf_;
     uint8_t debounce_buf_[4] = {};
     uint8_t debounce_bytes_read_ = 0;
-    TimerHandle_t nonce_timer_ = nullptr;
+    TimerHandle_t read_timer_ = nullptr;
 
     static constexpr size_t MAX_NONCE_LEN = 16;
-    static constexpr TickType_t NONCE_TIMEOUT_MS = 100;
+    static constexpr TickType_t READ_TIMEOUT_MS = 100;
 };

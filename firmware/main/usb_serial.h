@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <string>
 #include "esp_err.h"
@@ -27,10 +28,13 @@ public:
     /// Returns true if the host has the port open (DTR asserted).
     bool is_host_connected() const { return dtr_active_; }
 
+    /// Returns the RX queue handle for posting sentinel bytes from external contexts.
+    QueueHandle_t get_rx_queue() const { return rx_queue_; }
+
 private:
     UsbSerial() = default;
     RxCallback rx_callback_;
-    volatile bool dtr_active_ = false;
+    std::atomic<bool> dtr_active_{false};
 
     QueueHandle_t rx_queue_ = nullptr;
     TaskHandle_t process_task_ = nullptr;

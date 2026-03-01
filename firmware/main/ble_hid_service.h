@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <functional>
 
@@ -66,14 +67,18 @@ private:
     // Register the HID service and characteristics
     void register_hid_service();
 
+    // Remove all bonded devices from Bluedroid and NVS
+    void clear_all_bonds();
+
     // Configure BLE security parameters
     void configure_security();
 
     // Internal state
-    bool connected_ = false;
+    std::atomic<bool> connected_{false};
     bool service_registered_ = false;
-    uint16_t conn_id_ = 0;
+    std::atomic<uint16_t> conn_id_{0};
     esp_gatt_if_t gatts_if_ = ESP_GATT_IF_NONE;
+    esp_bd_addr_t peer_bda_ = {};
     std::string peer_name_;
 
     // GATT attribute handles

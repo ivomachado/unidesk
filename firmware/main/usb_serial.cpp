@@ -168,25 +168,41 @@ void UsbSerial::send_response(const std::string& response) {
     std::string msg = response + "\n";
 
     // tinyusb_cdcacm_write_queue returns size_t (bytes queued), NOT esp_err_t.
-    // A return value equal to msg.size() means all bytes were queued successfully.
-    // Retry only if zero bytes were queued (FIFO full / not ready).
+    // Loop with offset tracking to ensure the full message is queued before flushing.
     const int max_retries = 3;
     const int retry_delay_ms = 10;
+
     for (int attempt = 0; attempt < max_retries; attempt++) {
-        size_t queued = tinyusb_cdcacm_write_queue(TINYUSB_CDC_ACM_0, (const uint8_t*)msg.c_str(), msg.size());
-        if (queued > 0) {
-            if (queued < msg.size()) {
-                ESP_LOGW(TAG, "USB TX partial queue: %d/%d bytes", (int)queued, (int)msg.size());
+        // Queue all bytes, advancing through the buffer on partial writes
+        size_t total_queued = 0;
+        bool queue_failed = false;
+        while (total_queued < msg.size()) {
+            size_t queued = tinyusb_cdcacm_write_queue(
+                TINYUSB_CDC_ACM_0,
+                (const uint8_t*)msg.c_str() + total_queued,
+                msg.size() - total_queued);
+            if (queued == 0) {
+                ESP_LOGW(TAG, "USB TX queue returned 0 bytes at offset %d/%d (attempt %d/%d)",
+                         (int)total_queued, (int)msg.size(), attempt + 1, max_retries);
+                queue_failed = true;
+                break;
             }
-            esp_err_t flush_ret = tinyusb_cdcacm_write_flush(TINYUSB_CDC_ACM_0, pdMS_TO_TICKS(50));
-            if (flush_ret == ESP_OK) {
-                ESP_LOGI(TAG, "USB TX sent successfully (%d bytes)", (int)queued);
-                return;
-            }
-            ESP_LOGW(TAG, "USB TX flush failed (attempt %d/%d): %s", attempt + 1, max_retries, esp_err_to_name(flush_ret));
-        } else {
-            ESP_LOGW(TAG, "USB TX queue returned 0 bytes (attempt %d/%d)", attempt + 1, max_retries);
+            total_queued += queued;
         }
+
+        if (queue_failed) {
+            if (attempt < max_retries - 1) {
+                vTaskDelay(pdMS_TO_TICKS(retry_delay_ms));
+            }
+            continue;
+        }
+
+        esp_err_t flush_ret = tinyusb_cdcacm_write_flush(TINYUSB_CDC_ACM_0, pdMS_TO_TICKS(50));
+        if (flush_ret == ESP_OK) {
+            ESP_LOGI(TAG, "USB TX sent successfully (%d bytes)", (int)total_queued);
+            return;
+        }
+        ESP_LOGW(TAG, "USB TX flush failed (attempt %d/%d): %s", attempt + 1, max_retries, esp_err_to_name(flush_ret));
 
         if (attempt < max_retries - 1) {
             vTaskDelay(pdMS_TO_TICKS(retry_delay_ms));

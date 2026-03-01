@@ -233,14 +233,14 @@ struct MenuBarContentView: View {
             if serialPort.isConnected {
                 HStack(spacing: 12) {
                     Button {
-                        Task { await serialPort.brightnessDown() }
+                        serialPort.brightnessDown()
                     } label: {
                         Label("Brightness Down", systemImage: "sun.min")
                     }
                     .buttonStyle(.borderless)
 
                     Button {
-                        Task { await serialPort.brightnessUp() }
+                        serialPort.brightnessUp()
                     } label: {
                         Label("Brightness Up", systemImage: "sun.max")
                     }

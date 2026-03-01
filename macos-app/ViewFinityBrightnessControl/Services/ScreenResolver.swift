@@ -27,7 +27,6 @@ final class ScreenResolver: ObservableObject {
         "S27C9",
         "LS32C",
         "LS27C",
-        "S9"
     ]
 
     /// UserDefaults key for the user-override dictionary: [String(displayID): String(rawScreenType)]
@@ -168,51 +167,13 @@ final class ScreenResolver: ObservableObject {
 
     /// Reads the display product name from the IORegistry EDID info dictionary.
     private func readEDIDName(for displayID: CGDirectDisplayID) -> String {
-        // Get the IOService port for this display.
-        var serialNumber: UInt32 = 0
-        var vendorID: UInt32 = 0
-        var productID: UInt32 = 0
-
-        vendorID = CGDisplayVendorNumber(displayID)
-        productID = CGDisplayModelNumber(displayID)
-        serialNumber = CGDisplaySerialNumber(displayID)
-
-        // Build a matching dictionary for IODisplayConnect services.
-        let matching = IOServiceMatching("IODisplayConnect") as NSMutableDictionary
-
-        var iterator: io_iterator_t = 0
-        let result = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator)
-        guard result == KERN_SUCCESS else { return "" }
-        defer { IOObjectRelease(iterator) }
-
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            defer {
-                IOObjectRelease(service)
-                service = IOIteratorNext(iterator)
-            }
-
-            guard let infoDict = IODisplayCreateInfoDictionary(service, IOOptionBits(kIODisplayOnlyPreferredName))?.takeRetainedValue() as? [String: Any] else {
-                continue
-            }
-
-            // Match by vendor + product + serial to find the right display.
-            let dVendor = infoDict[kDisplayVendorID] as? UInt32 ?? 0
-            let dProduct = infoDict[kDisplayProductID] as? UInt32 ?? 0
-            let dSerial = infoDict[kDisplaySerialNumber] as? UInt32 ?? 0
-
-            guard dVendor == vendorID, dProduct == productID, dSerial == serialNumber else {
-                continue
-            }
-
-            // Extract the localised product name.
+        withMatchingIODisplayService(for: displayID) { _, infoDict in
             if let nameDict = infoDict[kDisplayProductName] as? [String: String],
                let name = nameDict.values.first {
                 return name
             }
-        }
-
-        return ""
+            return ""
+        } ?? ""
     }
 
     /// Checks whether the EDID model name matches known ViewFinity S9 patterns.
@@ -231,52 +192,11 @@ final class ScreenResolver: ObservableObject {
     private func supportsNativeBrightness(displayID: CGDirectDisplayID) -> Bool {
         // Attempt to read the current brightness via IOKit's DisplayServices.
         // If the call succeeds, the display supports native brightness.
-        var brightness: Float = 0
-
-        let service = IOServicePortFromCGDisplayID(displayID)
-        guard service != 0 else { return false }
-        defer { IOObjectRelease(service) }
-
-        let result = IODisplayGetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, &brightness)
-        return result == kIOReturnSuccess
-    }
-
-    /// Resolves the IOKit service for a given CGDirectDisplayID.
-    private func IOServicePortFromCGDisplayID(_ displayID: CGDirectDisplayID) -> io_service_t {
-        let vendorID = CGDisplayVendorNumber(displayID)
-        let productID = CGDisplayModelNumber(displayID)
-        let serialNumber = CGDisplaySerialNumber(displayID)
-
-        let matching = IOServiceMatching("IODisplayConnect") as NSMutableDictionary
-
-        var iterator: io_iterator_t = 0
-        let result = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator)
-        guard result == KERN_SUCCESS else { return 0 }
-        defer { IOObjectRelease(iterator) }
-
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            guard let infoDict = IODisplayCreateInfoDictionary(service, IOOptionBits(kIODisplayOnlyPreferredName))?.takeRetainedValue() as? [String: Any] else {
-                IOObjectRelease(service)
-                service = IOIteratorNext(iterator)
-                continue
-            }
-
-            let dVendor = infoDict[kDisplayVendorID] as? UInt32 ?? 0
-            let dProduct = infoDict[kDisplayProductID] as? UInt32 ?? 0
-            let dSerial = infoDict[kDisplaySerialNumber] as? UInt32 ?? 0
-
-            if dVendor == vendorID, dProduct == productID, dSerial == serialNumber {
-                // Found the matching service — return it without releasing.
-                IOObjectRelease(iterator)
-                return service
-            }
-
-            IOObjectRelease(service)
-            service = IOIteratorNext(iterator)
-        }
-
-        return 0
+        withMatchingIODisplayService(for: displayID) { service, _ in
+            var brightness: Float = 0
+            let result = IODisplayGetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, &brightness)
+            return result == kIOReturnSuccess
+        } ?? false
     }
 }
 

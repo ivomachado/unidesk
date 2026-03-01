@@ -92,7 +92,7 @@ bool BrightnessControl::send_brightness_report(uint16_t usage_code, const char *
         ESP_LOGE(TAG, "[%s] FAILED: consumer control press", direction);
         return false;
     }
-    vTaskDelay(pdMS_TO_TICKS(5));
+    vTaskDelay(pdMS_TO_TICKS(20));
 
     ESP_LOGI(TAG, "[%s] Sending consumer control release", direction);
     if (!ble.send_consumer_report(USAGE_RELEASE)) {

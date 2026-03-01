@@ -65,7 +65,9 @@ static const char *manufacturer_name = "DIY";
 static const char *model_number = "VF9-BB-01";
 static const uint8_t pnp_id_val[] = {0x02, 0x3A, 0x03, 0x01, 0x10, 0x01, 0x00};
 
-static uint8_t ccc_val[2] = {0x00, 0x00};
+static uint8_t consumer_ccc_val[2] = {0x00, 0x00};
+static uint8_t keyboard_ccc_val[2] = {0x00, 0x00};
+static uint8_t battery_ccc_val[2]  = {0x00, 0x00};
 static const uint8_t consumer_report_ref[2] = {0x01, 0x01};
 static const uint8_t keyboard_report_ref[2] = {0x02, 0x01};
 
@@ -168,11 +170,11 @@ static const esp_gatts_attr_db_t hid_gatt_db[HID_IDX_NB] = {
     [IDX_HID_CONTROL_VAL]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&HID_CONTROL_POINT_UUID, ESP_GATT_PERM_WRITE, 1, 1, &hid_control_point_val}},
     [IDX_CONSUMER_REPORT_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_DECL_UUID, ESP_GATT_PERM_READ, 1, 1, (uint8_t*)&char_prop_read_notify}},
     [IDX_CONSUMER_REPORT_VAL]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&HID_REPORT_UUID, ESP_GATT_PERM_READ, sizeof(consumer_report_val), sizeof(consumer_report_val), consumer_report_val}},
-    [IDX_CONSUMER_REPORT_CCC]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_CCC_UUID, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, 2, 2, ccc_val}},
+    [IDX_CONSUMER_REPORT_CCC]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_CCC_UUID, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, 2, 2, consumer_ccc_val}},
     [IDX_CONSUMER_REPORT_REF]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&REPORT_REF_UUID, ESP_GATT_PERM_READ, sizeof(consumer_report_ref), sizeof(consumer_report_ref), (uint8_t*)consumer_report_ref}},
     [IDX_KEYBOARD_REPORT_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_DECL_UUID, ESP_GATT_PERM_READ, 1, 1, (uint8_t*)&char_prop_read_notify}},
     [IDX_KEYBOARD_REPORT_VAL]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&HID_REPORT_UUID, ESP_GATT_PERM_READ, sizeof(keyboard_report_val), sizeof(keyboard_report_val), keyboard_report_val}},
-    [IDX_KEYBOARD_REPORT_CCC]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_CCC_UUID, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, 2, 2, ccc_val}},
+    [IDX_KEYBOARD_REPORT_CCC]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_CCC_UUID, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, 2, 2, keyboard_ccc_val}},
     [IDX_KEYBOARD_REPORT_REF]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&REPORT_REF_UUID, ESP_GATT_PERM_READ, sizeof(keyboard_report_ref), sizeof(keyboard_report_ref), (uint8_t*)keyboard_report_ref}},
 };
 
@@ -180,7 +182,7 @@ static const esp_gatts_attr_db_t bat_gatt_db[BAT_IDX_NB] = {
     [IDX_BAT_SVC] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&PRIMARY_SERVICE_UUID, ESP_GATT_PERM_READ, 2, 2, (uint8_t*)&BATTERY_SVC_UUID}},
     [IDX_BAT_LEVEL_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_DECL_UUID, ESP_GATT_PERM_READ, 1, 1, (uint8_t*)&char_prop_read_notify}},
     [IDX_BAT_LEVEL_VAL]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&BATTERY_LEVEL_UUID, ESP_GATT_PERM_READ, 1, 1, &battery_level_val}},
-    [IDX_BAT_LEVEL_CCC]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_CCC_UUID, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, 2, 2, ccc_val}},
+    [IDX_BAT_LEVEL_CCC]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&CHAR_CCC_UUID, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, 2, 2, battery_ccc_val}},
 };
 
 static const esp_gatts_attr_db_t dis_gatt_db[DIS_IDX_NB] = {
@@ -205,9 +207,23 @@ BleHidService& BleHidService::instance() {
 // GAP Event Handler
 // ============================================================================
 void BleHidService::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+    // Track whether both adv data and scan response data have been configured.
+    // Only start advertising once both are set to avoid a spurious double-start.
+    static bool adv_data_set = false;
+    static bool scan_rsp_set = false;
+
     switch (event) {
         case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-            esp_ble_gap_start_advertising(&adv_params_);
+            adv_data_set = true;
+            if (scan_rsp_set) {
+                esp_ble_gap_start_advertising(&adv_params_);
+            }
+            break;
+        case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
+            scan_rsp_set = true;
+            if (adv_data_set) {
+                esp_ble_gap_start_advertising(&adv_params_);
+            }
             break;
         case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
             if (param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
@@ -225,9 +241,12 @@ void BleHidService::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_
         case ESP_GAP_BLE_AUTH_CMPL_EVT: {
             auto &auth = param->ble_security.auth_cmpl;
             if (auth.success) {
-                ESP_LOGI(TAG, "BLE auth complete - bonded with %02x:%02x:%02x:%02x:%02x:%02x",
+                char bda_str[18];
+                snprintf(bda_str, sizeof(bda_str), "%02X:%02X:%02X:%02X:%02X:%02X",
                     auth.bd_addr[0], auth.bd_addr[1], auth.bd_addr[2],
                     auth.bd_addr[3], auth.bd_addr[4], auth.bd_addr[5]);
+                instance().peer_name_ = bda_str;
+                ESP_LOGI(TAG, "BLE auth complete - bonded with %s", bda_str);
             } else {
                 ESP_LOGW(TAG, "BLE auth failed, reason: 0x%x", auth.fail_reason);
             }
@@ -273,10 +292,10 @@ void BleHidService::handle_gatts_event(esp_gatts_cb_event_t event, esp_gatt_if_t
                 ESP_LOGE(TAG, "Create attr table failed: 0x%x", param->add_attr_tab.status);
                 break;
             }
-            uint16_t num = param->add_attr_tab.num_handle;
+            uint8_t svc_id = param->add_attr_tab.svc_inst_id;
             services_created++;
 
-            if (num == HID_IDX_NB) {
+            if (svc_id == 0) { // HID service (inst_id 0)
                 memcpy(hid_handle_table, param->add_attr_tab.handles, sizeof(hid_handle_table));
                 consumer_report_handle_ = hid_handle_table[IDX_CONSUMER_REPORT_VAL];
                 consumer_report_ccc_handle_ = hid_handle_table[IDX_CONSUMER_REPORT_CCC];
@@ -286,27 +305,28 @@ void BleHidService::handle_gatts_event(esp_gatts_cb_event_t event, esp_gatt_if_t
                 ESP_LOGI(TAG, "HID service started");
                 // Chain: create Battery service next
                 esp_ble_gatts_create_attr_tab(bat_gatt_db, gatts_if_, BAT_IDX_NB, 1);
-            } else if (num == BAT_IDX_NB) {
+            } else if (svc_id == 1) { // Battery service (inst_id 1)
                 memcpy(bat_handle_table, param->add_attr_tab.handles, sizeof(bat_handle_table));
                 battery_level_handle_ = bat_handle_table[IDX_BAT_LEVEL_VAL];
                 esp_ble_gatts_start_service(bat_handle_table[IDX_BAT_SVC]);
                 ESP_LOGI(TAG, "Battery service started");
                 // Chain: create Device Info service next
                 esp_ble_gatts_create_attr_tab(dis_gatt_db, gatts_if_, DIS_IDX_NB, 2);
-            } else if (num == DIS_IDX_NB) {
+            } else if (svc_id == 2) { // Device Info service (inst_id 2)
                 memcpy(dis_handle_table, param->add_attr_tab.handles, sizeof(dis_handle_table));
                 esp_ble_gatts_start_service(dis_handle_table[IDX_DIS_SVC]);
                 service_registered_ = true;
                 ESP_LOGI(TAG, "Device Info service started — all services ready");
             } else {
-                ESP_LOGE(TAG, "Unexpected handle count: %d", num);
+                ESP_LOGE(TAG, "Unexpected svc_inst_id: %d", svc_id);
             }
             break;
         }
         case ESP_GATTS_CONNECT_EVT: {
             connected_ = true;
             conn_id_ = param->connect.conn_id;
-            ESP_LOGI(TAG, "Client connected, conn_id=%d", conn_id_);
+            memcpy(peer_bda_, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+            ESP_LOGI(TAG, "Client connected, conn_id=%d", conn_id_.load());
             esp_ble_set_encryption(param->connect.remote_bda, ESP_BLE_SEC_ENCRYPT_MITM);
             esp_ble_conn_update_params_t conn_params = {};
             memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
@@ -320,6 +340,7 @@ void BleHidService::handle_gatts_event(esp_gatts_cb_event_t event, esp_gatt_if_t
         case ESP_GATTS_DISCONNECT_EVT: {
             connected_ = false;
             conn_id_ = 0;
+            memset(peer_bda_, 0, sizeof(peer_bda_));
             peer_name_.clear();
             ESP_LOGI(TAG, "Client disconnected, reason=0x%x", param->disconnect.reason);
             start_advertising();
@@ -442,12 +463,7 @@ std::string BleHidService::get_peer_name() const {
     return peer_name_;
 }
 
-void BleHidService::enter_pairing_mode() {
-    ESP_LOGI(TAG, "Entering pairing mode");
-    stop_advertising();
-    if (connected_) {
-        esp_ble_gap_disconnect(nullptr);
-    }
+void BleHidService::clear_all_bonds() {
     int dev_num = esp_ble_get_bond_device_num();
     if (dev_num > 0) {
         esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t*)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
@@ -457,10 +473,22 @@ void BleHidService::enter_pairing_mode() {
                 esp_ble_remove_bond_device(dev_list[i].bd_addr);
             }
             free(dev_list);
+        } else {
+            ESP_LOGE(TAG, "Failed to allocate bond device list (%d entries)", dev_num);
         }
     }
     NvsManager::clear_bonds();
+}
+
+void BleHidService::enter_pairing_mode() {
+    ESP_LOGI(TAG, "Entering pairing mode");
+    stop_advertising();
+    if (connected_) {
+        esp_ble_gap_disconnect(peer_bda_);
+    }
+    clear_all_bonds();
     connected_ = false;
+    memset(peer_bda_, 0, sizeof(peer_bda_));
     peer_name_.clear();
     vTaskDelay(pdMS_TO_TICKS(100));
     start_advertising();
@@ -469,20 +497,10 @@ void BleHidService::enter_pairing_mode() {
 void BleHidService::unpair() {
     ESP_LOGI(TAG, "Unpairing");
     if (connected_) {
-        esp_ble_gap_disconnect(nullptr);
+        esp_ble_gap_disconnect(peer_bda_);
     }
-    int dev_num = esp_ble_get_bond_device_num();
-    if (dev_num > 0) {
-        esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t*)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
-        if (dev_list) {
-            esp_ble_get_bond_device_list(&dev_num, dev_list);
-            for (int i = 0; i < dev_num; i++) {
-                esp_ble_remove_bond_device(dev_list[i].bd_addr);
-            }
-            free(dev_list);
-        }
-    }
-    NvsManager::clear_bonds();
+    clear_all_bonds();
     connected_ = false;
+    memset(peer_bda_, 0, sizeof(peer_bda_));
     peer_name_.clear();
 }

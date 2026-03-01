@@ -50,6 +50,6 @@ private:
     TaskHandle_t esc_task_ = nullptr;
     uint32_t esc_debounce_ms_ = 2000;
 
-    static constexpr size_t ESC_TASK_STACK = 3072;
+    static constexpr size_t ESC_TASK_STACK = 4096;
     static constexpr UBaseType_t ESC_TASK_PRIORITY = 5;
 };

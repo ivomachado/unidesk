@@ -98,6 +98,8 @@ final class SerialPortService: ObservableObject {
 
     /// When set, only responses matching this tag will resolve the continuation.
     /// All other responses are discarded as stale.
+    /// Use `consumeContinuation()` to atomically nil-check and clear in both
+    /// timeout and data-driven resume paths.
     private var expectedResponseTag: String?
 
     /// The nonce sent with the current handshake, used to match `OK:PING:<nonce>`.
@@ -203,7 +205,6 @@ final class SerialPortService: ObservableObject {
         }
 
         logger.info("Opening serial port: \(port)")
-        NSLog("[SerialPort] Opening serial port: %@", port)
 
         guard openPort(port) else {
             return
@@ -216,10 +217,8 @@ final class SerialPortService: ObservableObject {
         // assertion. The firmware log shows tinyusb_cdcacm_write_queue
         // fails if the host sends a command immediately after opening the
         // port — the CDC ACM endpoint isn't fully initialised yet.
-        NSLog("[SerialPort] Post-open settle delay (500ms) — waiting for ESP32 CDC TX to be ready…")
+        logger.debug("Post-open settle delay (500ms) — waiting for ESP32 CDC TX ready")
         try? await Task.sleep(nanoseconds: 500_000_000)
-
-        NSLog("[SerialPort] Sending handshake with nonce…")
 
         // Handshake — uses a random nonce so the app can instantly identify
         // the fresh response among stale OK:PING responses buffered from
@@ -271,24 +270,37 @@ final class SerialPortService: ObservableObject {
         lastError = savedError
     }
 
-    /// Sends a brightness-up command to the ESP32.
-    func brightnessUp() async {
-        guard isConnected else { return }
+    /// Sends a brightness-up command to the ESP32 (fire-and-forget — no response expected).
+    func brightnessUp() {
         do {
-            let _ = try await sendCommand(.brightnessUp)
+            try sendFireAndForget(.brightnessUp)
         } catch {
             logger.error("brightnessUp failed: \(error.localizedDescription)")
         }
     }
 
-    /// Sends a brightness-down command to the ESP32.
-    func brightnessDown() async {
-        guard isConnected else { return }
+    /// Sends a brightness-down command to the ESP32 (fire-and-forget — no response expected).
+    func brightnessDown() {
         do {
-            let _ = try await sendCommand(.brightnessDown)
+            try sendFireAndForget(.brightnessDown)
         } catch {
             logger.error("brightnessDown failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Writes a single-byte command without setting up a continuation or waiting
+    /// for a response. Used for brightness up/down which are fire-and-forget per
+    /// the serial protocol (the firmware sends no response for 0x01/0x02).
+    private func sendFireAndForget(_ command: SerialCommand) throws {
+        guard fileDescriptor >= 0 else { throw SerialError.notConnected }
+        var byte = command.rawValue
+        let written = write(fileDescriptor, &byte, 1)
+        guard written == 1 else {
+            let err = String(cString: strerror(errno))
+            logger.error("write() failed: \(err)")
+            throw SerialError.writeFailed(err)
+        }
+        logger.debug("TX fire-and-forget: 0x\(String(format: "%02X", command.rawValue))")
     }
 
     /// Instructs the ESP32 to enter BLE pairing mode (clears NVS and restarts advertising).
@@ -318,11 +330,11 @@ final class SerialPortService: ObservableObject {
         guard isConnected else { return }
         do {
             let response = try await sendCommand(.getStatus)
-            if case .status(let connected, let name) = response {
+            if case .status(let connected, _) = response {
                 bleConnected = connected
-                NSLog("[SerialPort] Status: BLE %@", connected ? "connected" : "disconnected")
+                logger.debug("Status: BLE \(connected ? "connected" : "disconnected")")
             } else {
-                NSLog("[SerialPort] getStatus returned unexpected response: %@", String(describing: response))
+                logger.warning("getStatus returned unexpected response: \(String(describing: response))")
             }
         } catch {
             logger.error("refreshStatus failed: \(error.localizedDescription)")
@@ -356,9 +368,7 @@ final class SerialPortService: ObservableObject {
         payload.append(UInt8( ms        & 0xFF))
 
         // Cancel any stale pending continuation.
-        if let stale = responseContinuation {
-            responseContinuation = nil
-            expectedResponseTag = nil
+        if let stale = consumeContinuation() {
             stale.resume(throwing: SerialError.timeout)
         }
 
@@ -371,7 +381,7 @@ final class SerialPortService: ObservableObject {
         }
 
         let tag = "ESC_DEBOUNCE"
-        NSLog("[SerialPort] TX: setEscDebounce %lu ms, expecting tag '%@'", UInt(ms), tag)
+        logger.debug("TX: setEscDebounce \(ms) ms")
 
         let response = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SerialResponse, Error>) in
             self.expectedResponseTag = tag
@@ -379,9 +389,7 @@ final class SerialPortService: ObservableObject {
 
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(Self.responseTimeout * 1_000_000_000))
-                if let pending = self?.responseContinuation {
-                    self?.responseContinuation = nil
-                    self?.expectedResponseTag = nil
+                if let pending = self?.consumeContinuation() {
                     pending.resume(throwing: SerialError.timeout)
                 }
             }
@@ -414,7 +422,7 @@ final class SerialPortService: ObservableObject {
         // after a brief delay — the first attempt may have been consumed by
         // stale data still being flushed from the ESP32.
         if isConnected && !bleConnected {
-            NSLog("[SerialPort] Status may have failed — retrying after 500ms…")
+            logger.debug("Status may have failed — retrying after 500ms")
             try? await Task.sleep(nanoseconds: 500_000_000)
             readBuffer.removeAll()
             await refreshStatus()
@@ -460,13 +468,6 @@ final class SerialPortService: ObservableObject {
             }
         }
 
-        // Fallback: return first /dev/cu.usbmodem* if IOKit matching didn't find VID/PID
-        let ports = availablePorts()
-        if let first = ports.first {
-            logger.info("VID/PID match failed; falling back to first usbmodem port: \(first)")
-            return first
-        }
-
         return nil
     }
 
@@ -510,8 +511,12 @@ final class SerialPortService: ObservableObject {
         // Clear the O_NONBLOCK flag now that the port is open — we want blocking-aware reads
         // via GCD, not spinning.
         var flags = fcntl(fd, F_GETFL)
-        flags &= ~O_NONBLOCK
-        fcntl(fd, F_SETFL, flags)
+        if flags >= 0 {
+            flags &= ~O_NONBLOCK
+            _ = fcntl(fd, F_SETFL, flags)
+        } else {
+            logger.warning("fcntl(F_GETFL) failed: \(String(cString: strerror(errno))) — O_NONBLOCK may remain set")
+        }
 
         // Acquire an exclusive lock
         if ioctl(fd, TIOCEXCL) == -1 {
@@ -530,7 +535,7 @@ final class SerialPortService: ObservableObject {
             // RTS is less critical but good practice for USB-CDC.
             logger.warning("ioctl(TIOCMBIS, TIOCM_RTS) failed — RTS not asserted")
         }
-        NSLog("[SerialPort] DTR/RTS asserted on fd=%d", fd)
+        logger.debug("DTR/RTS asserted on fd=\(fd)")
 
         // Configure termios
         var options = termios()
@@ -549,8 +554,11 @@ final class SerialPortService: ObservableObject {
         options.c_cflag |= UInt(CLOCAL | CREAD)
 
         // VMIN = 1 byte, VTIME = 0 (block until at least 1 byte)
-        options.c_cc.16 = 1   // VMIN
-        options.c_cc.17 = 0   // VTIME
+        withUnsafeMutablePointer(to: &options.c_cc) { ptr in
+            let cc = UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: cc_t.self)
+            cc[Int(VMIN)] = 1
+            cc[Int(VTIME)] = 0
+        }
 
         guard tcsetattr(fd, TCSANOW, &options) == 0 else {
             let err = String(cString: strerror(errno))
@@ -562,7 +570,7 @@ final class SerialPortService: ObservableObject {
 
         // Flush any stale data
         tcflush(fd, TCIOFLUSH)
-        NSLog("[SerialPort] Port opened and flushed: %@ (fd=%d)", path, fd)
+        logger.debug("Port opened and flushed: \(path) (fd=\(fd))")
 
         fileDescriptor = fd
         return true
@@ -584,14 +592,10 @@ final class SerialPortService: ObservableObject {
 
             if bytesRead > 0 {
                 let data = Data(buf[0..<bytesRead])
-                let hex = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-                let ascii = String(data: data, encoding: .utf8) ?? "<non-utf8>"
-                NSLog("[SerialPort] RX raw (%d bytes): [%@] ascii: %@", bytesRead, hex, ascii.replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\r", with: "\\r"))
                 Task { @MainActor [weak self] in
                     self?.processIncomingData(data)
                 }
             } else if bytesRead == 0 || (bytesRead < 0 && errno != EAGAIN && errno != EINTR) {
-                NSLog("[SerialPort] Read returned %d (errno=%d) — treating as disconnect", bytesRead, errno)
                 Task { @MainActor [weak self] in
                     self?.handlePortDisconnected()
                 }
@@ -611,7 +615,6 @@ final class SerialPortService: ObservableObject {
     /// Accumulates incoming bytes and dispatches complete newline-terminated lines.
     private func processIncomingData(_ data: Data) {
         readBuffer.append(data)
-        NSLog("[SerialPort] Buffer now %d bytes: %@", readBuffer.count, String(data: readBuffer, encoding: .utf8)?.replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\r", with: "\\r") ?? "<non-utf8>")
 
         // Process all complete lines in the buffer.
         while let newlineIndex = readBuffer.firstIndex(of: UInt8(ascii: "\n")) {
@@ -619,7 +622,6 @@ final class SerialPortService: ObservableObject {
             readBuffer.removeSubrange(readBuffer.startIndex...newlineIndex)
 
             guard let lineString = String(data: lineData, encoding: .utf8) else { continue }
-            NSLog("[SerialPort] Complete line extracted: '%@'", lineString.replacingOccurrences(of: "\r", with: "\\r"))
             handleResponseLine(lineString)
         }
 
@@ -630,25 +632,27 @@ final class SerialPortService: ObservableObject {
         }
     }
 
+    /// Atomically checks and clears the pending continuation, returning it if
+    /// one was present. Both the timeout task and the data-driven resume path
+    /// must use this to avoid double-resume of a `CheckedContinuation`.
+    private func consumeContinuation() -> CheckedContinuation<SerialResponse, Error>? {
+        guard let c = responseContinuation else { return nil }
+        responseContinuation = nil
+        expectedResponseTag = nil
+        return c
+    }
+
     /// Routes a parsed response line to the pending continuation (if any).
     private func handleResponseLine(_ line: String) {
         logger.debug("RX: \(line)")
-        NSLog("[SerialPort] handleResponseLine: '%@' | continuation pending: %@ | expectedTag: %@",
-              line,
-              responseContinuation != nil ? "YES" : "NO",
-              expectedResponseTag ?? "nil")
 
         guard let response = SerialResponse.parse(line) else {
             logger.warning("Unparseable response: \(line)")
-            NSLog("[SerialPort] ⚠️ Unparseable response (parse returned nil): '%@'", line)
             return
         }
 
-        NSLog("[SerialPort] Parsed response: %@", String(describing: response))
-
         guard responseContinuation != nil else {
-            NSLog("[SerialPort] ⚠️ Unsolicited response (no continuation): '%@'", line)
-            logger.info("Unsolicited response: \(line)")
+            logger.debug("Unsolicited response (no continuation): \(line)")
             return
         }
 
@@ -657,15 +661,12 @@ final class SerialPortService: ObservableObject {
         // sessions when the port is reopened.
         if let expected = expectedResponseTag {
             if !responseMatchesExpected(response, tag: expected) {
-                NSLog("[SerialPort] ⏭️ Skipping stale response (expected tag '%@'): '%@'", expected, line)
+                logger.debug("Skipping stale response (expected '\(expected)'): \(line)")
                 return
             }
         }
 
-        let continuation = responseContinuation!
-        responseContinuation = nil
-        expectedResponseTag = nil
-        NSLog("[SerialPort] ✅ Resuming continuation with response")
+        guard let continuation = consumeContinuation() else { return }
         continuation.resume(returning: response)
     }
 
@@ -736,9 +737,7 @@ final class SerialPortService: ObservableObject {
         guard fileDescriptor >= 0 else { throw SerialError.notConnected }
 
         // Cancel any stale pending continuation.
-        if let stale = responseContinuation {
-            responseContinuation = nil
-            expectedResponseTag = nil
+        if let stale = consumeContinuation() {
             handshakeNonce = nil
             stale.resume(throwing: SerialError.timeout)
         }
@@ -763,22 +762,17 @@ final class SerialPortService: ObservableObject {
 
         let tag = "PING:\(nonce)"
         logger.debug("TX: handshake with nonce '\(nonce)'")
-        NSLog("[SerialPort] TX: 0x04 + nonce '%@', expecting 'OK:PING:%@'", nonce, nonce)
 
         // Wait for the matching response with a timeout.
         return try await withCheckedThrowingContinuation { continuation in
             self.expectedResponseTag = tag
             self.responseContinuation = continuation
-            NSLog("[SerialPort] Continuation set, waiting for '%@' (timeout=%.1fs)…", tag, Self.responseTimeout)
 
             // Timeout task
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(Self.responseTimeout * 1_000_000_000))
-                if let pending = self?.responseContinuation {
-                    self?.responseContinuation = nil
-                    self?.expectedResponseTag = nil
+                if let pending = self?.consumeContinuation() {
                     self?.handshakeNonce = nil
-                    NSLog("[SerialPort] ❌ Response timeout — no matching '%@' within %.1fs", tag, Self.responseTimeout)
                     pending.resume(throwing: SerialError.timeout)
                 }
             }
@@ -791,9 +785,7 @@ final class SerialPortService: ObservableObject {
         guard fileDescriptor >= 0 else { throw SerialError.notConnected }
 
         // Cancel any stale pending continuation.
-        if let stale = responseContinuation {
-            responseContinuation = nil
-            expectedResponseTag = nil
+        if let stale = consumeContinuation() {
             stale.resume(throwing: SerialError.timeout)
         }
 
@@ -808,22 +800,17 @@ final class SerialPortService: ObservableObject {
 
         let tag = expectedTag(for: command)
         logger.debug("TX: 0x\(String(format: "%02X", command.rawValue))")
-        NSLog("[SerialPort] TX: 0x%02X (%@), expecting tag '%@'", command.rawValue, String(describing: command), tag)
 
         // Wait for the matching response with a timeout.
         // Non-matching (stale) responses are skipped by handleResponseLine.
         return try await withCheckedThrowingContinuation { continuation in
             self.expectedResponseTag = tag
             self.responseContinuation = continuation
-            NSLog("[SerialPort] Continuation set, waiting for '%@' (timeout=%.1fs)…", tag, Self.responseTimeout)
 
             // Timeout task
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(Self.responseTimeout * 1_000_000_000))
-                if let pending = self?.responseContinuation {
-                    self?.responseContinuation = nil
-                    self?.expectedResponseTag = nil
-                    NSLog("[SerialPort] ❌ Response timeout — no matching '%@' within %.1fs", tag, Self.responseTimeout)
+                if let pending = self?.consumeContinuation() {
                     pending.resume(throwing: SerialError.timeout)
                 }
             }
@@ -833,8 +820,6 @@ final class SerialPortService: ObservableObject {
     // MARK: - Disconnect / Cleanup
 
     private func disconnectSync() {
-        NSLog("[SerialPort] disconnectSync — fd=%d, readSource=%@, bufferSize=%d", fileDescriptor, readSource != nil ? "active" : "nil", readBuffer.count)
-        expectedResponseTag = nil
         handshakeNonce = nil
         readSource?.cancel()
         readSource = nil
@@ -843,16 +828,14 @@ final class SerialPortService: ObservableObject {
             // Restore original termios
             tcsetattr(fileDescriptor, TCSANOW, &originalTermios)
             close(fileDescriptor)
-            NSLog("[SerialPort] Port closed (fd=%d)", fileDescriptor)
+            logger.debug("Port closed (fd=\(self.fileDescriptor))")
             fileDescriptor = -1
         }
 
         readBuffer.removeAll()
 
         // Cancel any pending continuation
-        if let pending = responseContinuation {
-            responseContinuation = nil
-            NSLog("[SerialPort] Cancelling pending continuation on disconnect")
+        if let pending = consumeContinuation() {
             pending.resume(throwing: SerialError.notConnected)
         }
     }

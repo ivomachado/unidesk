@@ -1,5 +1,7 @@
 # Firmware — Agent Landmines
 
+- **ESP-IDF environment setup:** Source `~/Workspace/esp/esp-idf/export.sh` before running `idf.py` commands.
+
 - Console output must be routed to **UART0** (`CONFIG_ESP_CONSOLE_UART_DEFAULT=y`), not USB. The native USB port is used for CDC serial communication with the macOS app — routing console logs there causes conflicts and garbled data.
 - The ESC key sent after brightness Consumer Control reports must be **debounced**. During rapid brightness adjustments (key held down), only a single ESC should be sent after the burst settles. Without this, the monitor's OSD flickers on every keystroke. The timeout is user-configurable (200–10000 ms, default 2000 ms) and stored in NVS under `app_settings/esc_dbnc_ms`.
 - NVS init must handle `ESP_ERR_NVS_NO_FREE_PAGES` by erasing and reinitializing. Without this, the firmware crashes on first boot after a flash erase.
@@ -10,3 +12,6 @@
 - `tinyusb_cdcacm_write_queue()` returns `size_t` (bytes queued), **not** `esp_err_t` — always check ESP-IDF function signatures before assuming the return type is an error code.
 - BLE and USB coexist without resource conflicts (radio vs USB peripheral), but they must be initialized in order: NVS → BLE → USB-CDC.
 - Bond storage is limited to ~10 devices by default in ESP-IDF. For this use case only 1 bond (the monitor) is needed. Pairing mode (`0x03`) clears all bonds before re-advertising.
+- Each GATT CCCD (Client Characteristic Configuration Descriptor) **must** have its own backing `uint8_t[2]` array. Sharing a single array across Consumer Control, Keyboard, and Battery CCCDs causes CCCD writes from one report to silently corrupt notification state for the others.
+- `esp_ble_gap_disconnect()` requires a valid `esp_bd_addr_t` — passing `nullptr` crashes or silently fails depending on ESP-IDF version. Store the remote BDA from `ESP_GATTS_CONNECT_EVT` and pass it to disconnect calls.
+- `UsbSerial::set_rx_callback()` is **set-once-before-init**. The `rx_callback_` (`std::function`) is not protected by a mutex; it is written from `app_main` and read from the `usb_cmd_proc` task. Never reassign it after `UsbSerial::init()` returns.

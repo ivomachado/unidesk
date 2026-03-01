@@ -48,6 +48,8 @@ Manages the USB-CDC serial connection to the ESP32-S3:
 
 See [PROTOCOL.md](../PROTOCOL.md) for the full serial protocol specification.
 
+**Threading model:** All service state (`fileDescriptor`, `readBuffer`, `responseContinuation`, `@Published` properties) lives on `@MainActor`, which eliminates data races without explicit locking. Serial **reads** happen on a background GCD queue via `DispatchSourceRead`; the handler parses raw bytes there and hops to `@MainActor` only to update state. Serial **writes** (`write()` syscalls) execute directly on the main thread. This is acceptable because commands are 1–7 bytes and the kernel USB-CDC buffer absorbs them in microseconds — main-thread blocking is unmeasurable. If the app ever needs bulk transfers or encounters a slow USB bus, writes should move to a dedicated `DispatchQueue` with synchronized `fileDescriptor` access.
+
 #### `KeyInterceptor`
 
 Intercepts brightness key presses using `CGEventTapCreate` with `.defaultTap`:

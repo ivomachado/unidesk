@@ -31,8 +31,5 @@ extern "C" void app_main(void) {
 
     ESP_LOGI(TAG, "VF9 Brightness Bridge ready");
 
-    // 6. Idle loop — all work is event/callback driven
-    while (true) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
+    // All work is event/callback driven — app_main returns and FreeRTOS reclaims the task stack.
 }

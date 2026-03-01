@@ -14,30 +14,33 @@ CommandHandler& CommandHandler::instance() {
 }
 
 CommandHandler::CommandHandler() {
-    nonce_timer_ = xTimerCreate(
-        "nonce_timeout",
-        pdMS_TO_TICKS(NONCE_TIMEOUT_MS),
+    read_timer_ = xTimerCreate(
+        "read_timeout",
+        pdMS_TO_TICKS(READ_TIMEOUT_MS),
         pdFALSE,  // one-shot
         this,
-        &CommandHandler::nonce_timeout_cb
+        &CommandHandler::read_timeout_cb
     );
-    if (!nonce_timer_) {
-        ESP_LOGE(TAG, "Failed to create nonce timeout timer");
+    if (!read_timer_) {
+        ESP_LOGE(TAG, "Failed to create read timeout timer");
     }
 }
 
 CommandHandler::~CommandHandler() {
-    if (nonce_timer_) {
-        xTimerDelete(nonce_timer_, 0);
+    if (read_timer_) {
+        xTimerDelete(read_timer_, 0);
     }
 }
 
-void CommandHandler::nonce_timeout_cb(TimerHandle_t timer) {
-    auto *self = reinterpret_cast<CommandHandler*>(pvTimerGetTimerID(timer));
-    if (self->state_ == State::READING_NONCE) {
-        ESP_LOGW(TAG, "Nonce timeout after %dms, completing ping without nonce", (int)NONCE_TIMEOUT_MS);
-        self->nonce_buf_.clear();
-        self->complete_ping();
+// Timer callback — runs in the FreeRTOS timer daemon task.
+// To avoid racing with handle_byte() (which runs in usb_cmd_proc task),
+// we post a sentinel byte to the same RX queue instead of mutating state directly.
+void CommandHandler::read_timeout_cb(TimerHandle_t timer) {
+    ESP_LOGW(TAG, "Read timeout after %dms, posting sentinel to RX queue", (int)READ_TIMEOUT_MS);
+    QueueHandle_t rx_queue = UsbSerial::instance().get_rx_queue();
+    if (rx_queue) {
+        uint8_t sentinel = SENTINEL_TIMEOUT;
+        xQueueSend(rx_queue, &sentinel, 0);
     }
 }
 
@@ -46,16 +49,25 @@ void CommandHandler::handle_byte(uint8_t byte) {
 
     switch (state_) {
         case State::IDLE: {
+            // Ignore sentinel bytes that arrive when we're already idle
+            // (e.g. timer fired after state was already reset by normal completion)
+            if (byte == SENTINEL_TIMEOUT) {
+                ESP_LOGD(TAG, "Sentinel in IDLE state — ignoring");
+                break;
+            }
             if (byte == CMD_PING) {
                 state_ = State::READING_NONCE;
                 nonce_buf_.clear();
-                if (nonce_timer_) {
-                    xTimerReset(nonce_timer_, 0);
+                if (read_timer_) {
+                    xTimerReset(read_timer_, 0);
                 }
                 ESP_LOGI(TAG, "CMD: Ping received, waiting for nonce...");
             } else if (byte == CMD_SET_ESC_DEBOUNCE) {
                 state_ = State::READING_ESC_DEBOUNCE;
                 debounce_bytes_read_ = 0;
+                if (read_timer_) {
+                    xTimerReset(read_timer_, 0);
+                }
                 ESP_LOGI(TAG, "CMD: SetEscDebounce received, waiting for 4-byte value...");
             } else {
                 dispatch_simple_command(byte);
@@ -63,9 +75,13 @@ void CommandHandler::handle_byte(uint8_t byte) {
             break;
         }
         case State::READING_NONCE: {
-            if (byte == '\n') {
-                if (nonce_timer_) {
-                    xTimerStop(nonce_timer_, 0);
+            if (byte == SENTINEL_TIMEOUT) {
+                ESP_LOGW(TAG, "Nonce read timed out, completing ping without nonce");
+                nonce_buf_.clear();
+                complete_ping();
+            } else if (byte == '\n') {
+                if (read_timer_) {
+                    xTimerStop(read_timer_, 0);
                 }
                 ESP_LOGI(TAG, "Nonce complete: \"%s\"", nonce_buf_.c_str());
                 complete_ping();
@@ -73,17 +89,27 @@ void CommandHandler::handle_byte(uint8_t byte) {
                 nonce_buf_ += (char)byte;
             } else {
                 ESP_LOGW(TAG, "Nonce exceeded max length (%d), completing", (int)MAX_NONCE_LEN);
-                if (nonce_timer_) {
-                    xTimerStop(nonce_timer_, 0);
+                if (read_timer_) {
+                    xTimerStop(read_timer_, 0);
                 }
                 complete_ping();
             }
             break;
         }
         case State::READING_ESC_DEBOUNCE: {
-            debounce_buf_[debounce_bytes_read_++] = byte;
-            if (debounce_bytes_read_ == 4) {
-                complete_set_esc_debounce();
+            if (byte == SENTINEL_TIMEOUT) {
+                ESP_LOGW(TAG, "ESC debounce read timed out after %d byte(s), resetting", debounce_bytes_read_);
+                state_ = State::IDLE;
+                debounce_bytes_read_ = 0;
+                UsbSerial::instance().send_response("ERR:TIMEOUT");
+            } else {
+                debounce_buf_[debounce_bytes_read_++] = byte;
+                if (debounce_bytes_read_ == 4) {
+                    if (read_timer_) {
+                        xTimerStop(read_timer_, 0);
+                    }
+                    complete_set_esc_debounce();
+                }
             }
             break;
         }

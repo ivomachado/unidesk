@@ -2,6 +2,63 @@ import AppKit
 import IOKit.graphics
 import os.log
 
+// MARK: - Shared IOKit Display Matching
+
+/// Iterates all `IODisplayConnect` services in the IORegistry and calls `body`
+/// with the first service whose vendor, product, and serial number match
+/// the given `CGDirectDisplayID`.
+///
+/// The caller receives an **unretained** `io_service_t` and the already-parsed
+/// info dictionary. The service is released automatically after `body` returns;
+/// if the caller needs to keep it (e.g. for `IODisplaySetFloatParameter`), they
+/// must call `IOObjectRetain` on it and take ownership.
+///
+/// - Returns: The value returned by `body`, or `nil` if no matching service was found.
+func withMatchingIODisplayService<T>(
+    for displayID: CGDirectDisplayID,
+    body: (io_service_t, [String: Any]) -> T
+) -> T? {
+    let vendorID    = CGDisplayVendorNumber(displayID)
+    let productID   = CGDisplayModelNumber(displayID)
+    let serialNumber = CGDisplaySerialNumber(displayID)
+
+    let matching = IOServiceMatching("IODisplayConnect") as NSMutableDictionary
+
+    var iterator: io_iterator_t = 0
+    let result = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator)
+    guard result == KERN_SUCCESS else { return nil }
+    defer { IOObjectRelease(iterator) }
+
+    var service = IOIteratorNext(iterator)
+    while service != 0 {
+        defer {
+            IOObjectRelease(service)
+            service = IOIteratorNext(iterator)
+        }
+
+        guard let infoDict = IODisplayCreateInfoDictionary(
+            service,
+            IOOptionBits(kIODisplayOnlyPreferredName)
+        )?.takeRetainedValue() as? [String: Any] else {
+            continue
+        }
+
+        let dVendor  = infoDict[kDisplayVendorID]     as? UInt32 ?? 0
+        let dProduct = infoDict[kDisplayProductID]     as? UInt32 ?? 0
+        let dSerial  = infoDict[kDisplaySerialNumber]  as? UInt32 ?? 0
+
+        guard dVendor == vendorID, dProduct == productID, dSerial == serialNumber else {
+            continue
+        }
+
+        return body(service, infoDict)
+    }
+
+    return nil
+}
+
+// MARK: - BrightnessRouter
+
 /// Routes brightness adjustment commands to the correct backend based on which
 /// display the cursor is currently over.
 ///
@@ -65,10 +122,8 @@ final class BrightnessRouter: ObservableObject {
             return
         }
 
-        let service = ioServicePort(for: displayID)
-        guard service != 0 else {
-            logger.warning("Could not find IOService for display \(displayID) — trying fallback")
-            adjustBrightnessFallback(action: action)
+        guard let service = retainedIOServicePort(for: displayID) else {
+            logger.warning("Could not find IOService for display \(displayID)")
             return
         }
         defer { IOObjectRelease(service) }
@@ -77,8 +132,7 @@ final class BrightnessRouter: ObservableObject {
         var current: Float = 0
         let readResult = IODisplayGetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, &current)
         guard readResult == kIOReturnSuccess else {
-            logger.warning("IODisplayGetFloatParameter failed (\(readResult)) — trying fallback")
-            adjustBrightnessFallback(action: action)
+            logger.warning("IODisplayGetFloatParameter failed (\(readResult))")
             return
         }
 
@@ -92,73 +146,6 @@ final class BrightnessRouter: ObservableObject {
         } else {
             logger.error("IODisplaySetFloatParameter failed (\(writeResult))")
         }
-    }
-
-    /// Fallback: use the `brightness` CLI tool if IOKit direct control isn't available.
-    private func adjustBrightnessFallback(action: BrightnessAction) {
-        // Try to find the `brightness` CLI in common locations.
-        let candidates = ["/usr/local/bin/brightness", "/opt/homebrew/bin/brightness"]
-        guard let tool = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-            logger.warning("No `brightness` CLI found — cannot adjust native brightness via fallback")
-            return
-        }
-
-        // The `brightness` CLI typically works with the built-in display.
-        // Usage: `brightness <float 0.0–1.0>`
-        // We read the current value via the tool, adjust, and write back.
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: tool)
-
-        // Read current value first.
-        let readPipe = Pipe()
-        process.standardOutput = readPipe
-        process.arguments = ["-l"]
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            logger.error("Failed to run brightness CLI: \(error.localizedDescription)")
-            return
-        }
-
-        let output = String(data: readPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-
-        // Parse current brightness from output (format: "display 0: brightness X.XXXXXX")
-        guard let currentValue = parseBrightnessOutput(output) else {
-            logger.warning("Could not parse brightness CLI output")
-            return
-        }
-
-        let delta: Float = (action == .up) ? Self.brightnessStep : -Self.brightnessStep
-        let newValue = min(max(currentValue + delta, 0), 1)
-
-        let setProcess = Process()
-        setProcess.executableURL = URL(fileURLWithPath: tool)
-        setProcess.arguments = [String(format: "%.4f", newValue)]
-
-        do {
-            try setProcess.run()
-            setProcess.waitUntilExit()
-            logger.debug("Fallback brightness set to \(String(format: "%.2f", newValue))")
-        } catch {
-            logger.error("Failed to set brightness via CLI: \(error.localizedDescription)")
-        }
-    }
-
-    /// Parses the output of `brightness -l` to extract the current brightness float.
-    private func parseBrightnessOutput(_ output: String) -> Float? {
-        // Expected format: "display 0: brightness 0.671875"
-        let lines = output.components(separatedBy: .newlines)
-        for line in lines {
-            if line.contains("brightness") {
-                let parts = line.components(separatedBy: " ")
-                if let last = parts.last, let value = Float(last) {
-                    return value
-                }
-            }
-        }
-        return nil
     }
 
     // MARK: - Serial Brightness (ESP32)
@@ -180,51 +167,21 @@ final class BrightnessRouter: ObservableObject {
 
             switch action {
             case .up:
-                await serialPort.brightnessUp()
+                serialPort.brightnessUp()
             case .down:
-                await serialPort.brightnessDown()
+                serialPort.brightnessDown()
             }
         }
     }
 
     // MARK: - IOKit Helpers
 
-    /// Resolves the IOKit service for a given `CGDirectDisplayID`.
-    private func ioServicePort(for displayID: CGDirectDisplayID) -> io_service_t {
-        let vendorID = CGDisplayVendorNumber(displayID)
-        let productID = CGDisplayModelNumber(displayID)
-        let serialNumber = CGDisplaySerialNumber(displayID)
-
-        let matching = IOServiceMatching("IODisplayConnect") as NSMutableDictionary
-
-        var iterator: io_iterator_t = 0
-        let result = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator)
-        guard result == KERN_SUCCESS else { return 0 }
-        defer { IOObjectRelease(iterator) }
-
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            guard let infoDict = IODisplayCreateInfoDictionary(
-                service,
-                IOOptionBits(kIODisplayOnlyPreferredName)
-            )?.takeRetainedValue() as? [String: Any] else {
-                IOObjectRelease(service)
-                service = IOIteratorNext(iterator)
-                continue
-            }
-
-            let dVendor  = infoDict[kDisplayVendorID]    as? UInt32 ?? 0
-            let dProduct = infoDict[kDisplayProductID]   as? UInt32 ?? 0
-            let dSerial  = infoDict[kDisplaySerialNumber] as? UInt32 ?? 0
-
-            if dVendor == vendorID, dProduct == productID, dSerial == serialNumber {
-                return service // caller is responsible for IOObjectRelease
-            }
-
-            IOObjectRelease(service)
-            service = IOIteratorNext(iterator)
+    /// Returns a **retained** `io_service_t` for the given display ID.
+    /// The caller must call `IOObjectRelease` when done.
+    private func retainedIOServicePort(for displayID: CGDirectDisplayID) -> io_service_t? {
+        withMatchingIODisplayService(for: displayID) { service, _ in
+            IOObjectRetain(service)
+            return service
         }
-
-        return 0
     }
 }
