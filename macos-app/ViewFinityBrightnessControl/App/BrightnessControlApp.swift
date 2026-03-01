@@ -116,15 +116,25 @@ final class SettingsWindowController {
             screenResolver: screenResolver
         )
 
-        let hostingView = NSHostingController(rootView: settingsView)
-
         let newWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 380, height: 500),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        newWindow.contentViewController = hostingView
+
+        // Use NSHostingView directly as contentView instead of
+        // NSHostingController as contentViewController.
+        // NSHostingController registers a windowDidLayout observer that calls
+        // updateAnimatedWindowSize(_:) on every layout cycle. When @Published
+        // property changes alter the SwiftUI layout (e.g. error banner
+        // appearing), the window resize triggers KVO → setNeedsUpdate →
+        // _postWindowNeedsUpdateConstraints re-entrantly inside the active
+        // display cycle → SIGABRT.
+        // A plain NSHostingView with autoresizing mask avoids this entirely.
+        let hostingView = NSHostingView(rootView: settingsView)
+        hostingView.autoresizingMask = [.width, .height]
+        newWindow.contentView = hostingView
         newWindow.title = "ViewFinity Brightness Control — Settings"
         newWindow.center()
         newWindow.isReleasedWhenClosed = false

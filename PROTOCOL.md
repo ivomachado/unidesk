@@ -21,14 +21,34 @@ The ESP32-S3 appears as a CDC ACM device at `/dev/cu.usbmodem*` with VID `0x303A
 
 Commands are single bytes, except for the handshake which includes a nonce.
 
-| Bytes                | Command            | Description                                          |
-|----------------------|--------------------|------------------------------------------------------|
-| `0x01`               | Brightness Up      | Send BLE HID brightness increment to paired monitor (fire-and-forget — no response) |
-| `0x02`               | Brightness Down    | Send BLE HID brightness decrement to paired monitor (fire-and-forget — no response) |
-| `0x03`               | Enter Pairing Mode | Clear NVS bonds, restart BLE advertising             |
-| `0x04` `<nonce>` `\n` | Handshake / Ping   | Verify firmware is alive; nonce is echoed back        |
-| `0x05`               | Get Status         | Query BLE connection state and paired device name     |
-| `0x06`               | Unpair             | Clear BLE bond, disconnect if connected               |
+| Bytes                         | Command              | Description                                          |
+|-------------------------------|----------------------|------------------------------------------------------|
+| `0x01`                        | Brightness Up        | Send BLE HID brightness increment to paired monitor (fire-and-forget — no response) |
+| `0x02`                        | Brightness Down      | Send BLE HID brightness decrement to paired monitor (fire-and-forget — no response) |
+| `0x03`                        | Enter Pairing Mode   | Clear NVS bonds, restart BLE advertising             |
+| `0x04` `<nonce>` `\n`         | Handshake / Ping     | Verify firmware is alive; nonce is echoed back        |
+| `0x05`                        | Get Status           | Query BLE connection state and paired device name     |
+| `0x06`                        | Unpair               | Clear BLE bond, disconnect if connected               |
+| `0x07` `<ms_hi>` `<ms_lo2>` `<ms_lo1>` `<ms_lo0>` | Set ESC Debounce | Set and persist the ESC dismiss debounce timeout (4 bytes, big-endian uint32, milliseconds; clamped to 200–10000) |
+| `0x08`                        | Get ESC Debounce     | Query the current ESC debounce timeout                |
+
+### Set ESC Debounce Format
+
+The set-ESC-debounce command (`0x07`) is followed by exactly **4 bytes** encoding the desired timeout in milliseconds as a big-endian unsigned 32-bit integer. No terminator byte is needed — the firmware reads exactly 4 bytes after the command byte.
+
+```
+0x07 <byte3> <byte2> <byte1> <byte0>
+```
+
+Example — set 1500 ms (0x000005DC):
+
+```
+0x07 0x00 0x00 0x05 0xDC
+```
+
+The firmware clamps the value to the range **200–10000 ms** before applying and persisting it.
+
+---
 
 ### Handshake Format
 
@@ -54,6 +74,8 @@ All responses are **newline-terminated ASCII strings** prefixed by a tag (`OK`, 
 | `OK:PAIRING\n`                              | `0x03`        | NVS cleared, BLE advertising restarted in pairing mode             |
 | `OK:UNPAIRED\n`                             | `0x06`        | BLE bond cleared                                                   |
 | `STATUS:<connected\|disconnected>:<name>\n` | `0x05`        | BLE state and paired device name (empty string if none paired)     |
+| `OK:ESC_DEBOUNCE:<ms>\n`                    | `0x07`        | Confirms the new debounce value (clamped); `<ms>` is a decimal integer |
+| `OK:ESC_DEBOUNCE:<ms>\n`                    | `0x08`        | Current debounce timeout in milliseconds                           |
 | `ERR:<message>\n`                           | Any (except `0x01`, `0x02`) | Human-readable error                                |
 
 ### Known Error Messages

@@ -167,20 +167,25 @@ void UsbSerial::send_response(const std::string& response) {
 
     std::string msg = response + "\n";
 
-    // Retry write up to 3 times with short fixed delays
+    // tinyusb_cdcacm_write_queue returns size_t (bytes queued), NOT esp_err_t.
+    // A return value equal to msg.size() means all bytes were queued successfully.
+    // Retry only if zero bytes were queued (FIFO full / not ready).
     const int max_retries = 3;
     const int retry_delay_ms = 10;
     for (int attempt = 0; attempt < max_retries; attempt++) {
-        esp_err_t ret = tinyusb_cdcacm_write_queue(TINYUSB_CDC_ACM_0, (const uint8_t*)msg.c_str(), msg.size());
-        if (ret == ESP_OK) {
-            ret = tinyusb_cdcacm_write_flush(TINYUSB_CDC_ACM_0, pdMS_TO_TICKS(50));
-            if (ret == ESP_OK) {
-                ESP_LOGI(TAG, "USB TX sent successfully");
+        size_t queued = tinyusb_cdcacm_write_queue(TINYUSB_CDC_ACM_0, (const uint8_t*)msg.c_str(), msg.size());
+        if (queued > 0) {
+            if (queued < msg.size()) {
+                ESP_LOGW(TAG, "USB TX partial queue: %d/%d bytes", (int)queued, (int)msg.size());
+            }
+            esp_err_t flush_ret = tinyusb_cdcacm_write_flush(TINYUSB_CDC_ACM_0, pdMS_TO_TICKS(50));
+            if (flush_ret == ESP_OK) {
+                ESP_LOGI(TAG, "USB TX sent successfully (%d bytes)", (int)queued);
                 return;
             }
-            ESP_LOGW(TAG, "USB TX flush failed (attempt %d/%d): %s", attempt + 1, max_retries, esp_err_to_name(ret));
+            ESP_LOGW(TAG, "USB TX flush failed (attempt %d/%d): %s", attempt + 1, max_retries, esp_err_to_name(flush_ret));
         } else {
-            ESP_LOGW(TAG, "USB TX queue failed (attempt %d/%d): %s", attempt + 1, max_retries, esp_err_to_name(ret));
+            ESP_LOGW(TAG, "USB TX queue returned 0 bytes (attempt %d/%d)", attempt + 1, max_retries);
         }
 
         if (attempt < max_retries - 1) {

@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
 #include "freertos/task.h"
+#include <cstdint>
 
 class BrightnessControl {
 public:
@@ -17,8 +18,11 @@ public:
     /// ESC dismiss is deferred and debounced.
     bool brightness_down();
 
-    /// How long to wait after the last brightness command before sending ESC (ms).
-    static constexpr uint32_t ESC_DEBOUNCE_MS = 2000;
+    /// Returns the current ESC debounce timeout in milliseconds.
+    uint32_t get_esc_debounce_ms() const { return esc_debounce_ms_; }
+
+    /// Updates the ESC debounce timeout. Takes effect on the next brightness command.
+    void set_esc_debounce_ms(uint32_t ms);
 
 private:
     BrightnessControl();
@@ -44,6 +48,7 @@ private:
 
     TimerHandle_t esc_timer_ = nullptr;
     TaskHandle_t esc_task_ = nullptr;
+    uint32_t esc_debounce_ms_ = 2000;
 
     static constexpr size_t ESC_TASK_STACK = 3072;
     static constexpr UBaseType_t ESC_TASK_PRIORITY = 5;

@@ -7,12 +7,14 @@ import os.log
 // MARK: - Serial Protocol Constants
 
 enum SerialCommand: UInt8 {
-    case brightnessUp   = 0x01
-    case brightnessDown = 0x02
-    case enterPairing   = 0x03
-    case handshake      = 0x04
-    case getStatus      = 0x05
-    case unpair         = 0x06
+    case brightnessUp      = 0x01
+    case brightnessDown    = 0x02
+    case enterPairing      = 0x03
+    case handshake         = 0x04
+    case getStatus         = 0x05
+    case unpair            = 0x06
+    case setEscDebounce    = 0x07
+    case getEscDebounce    = 0x08
 }
 
 enum SerialResponse {
@@ -113,6 +115,10 @@ final class SerialPortService: ObservableObject {
     /// Whether we're in the middle of a reconnect attempt.
     private var isReconnecting = false
 
+    /// Whether `connect()` is currently executing — guards against concurrent calls
+    /// from the Settings UI, USB notifications, wake handler, or BrightnessRouter.
+    private var isConnecting = false
+
     /// Set when handshake fails — prevents auto-reconnect loops when the
     /// board is present but running wrong/no firmware.
     private var handshakeFailed = false
@@ -169,10 +175,17 @@ final class SerialPortService: ObservableObject {
     /// Attempts to connect to the ESP32. Discovers the port automatically or uses
     /// the user-preferred port path. Performs a handshake after opening.
     func connect() async {
+        guard !isConnecting else {
+            logger.info("connect() already in progress — skipping concurrent call")
+            return
+        }
         guard fileDescriptor == -1 else {
             logger.info("Already connected on \(self.portPath ?? "?")")
             return
         }
+
+        isConnecting = true
+        defer { isConnecting = false }
 
         lastError = nil
         handshakeFailed = false
@@ -320,6 +333,83 @@ final class SerialPortService: ObservableObject {
         } catch {
             logger.error("refreshStatus failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Queries the ESC debounce timeout from the ESP32 (milliseconds).
+    /// Returns nil if not connected or on error.
+    func getEscDebounce() async -> UInt32? {
+        guard isConnected else { return nil }
+        do {
+            let response = try await sendCommand(.getEscDebounce)
+            return parseEscDebounceResponse(response)
+        } catch {
+            logger.error("getEscDebounce failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Sends a new ESC debounce timeout (milliseconds) to the ESP32 and persists it in NVS.
+    /// Returns the clamped value confirmed by the firmware, or nil on error.
+    @discardableResult
+    func setEscDebounce(_ ms: UInt32) async throws -> UInt32 {
+        guard isConnected else { throw SerialError.notConnected }
+
+        // Encode as 4 big-endian bytes appended immediately after the command byte.
+        var payload = Data([SerialCommand.setEscDebounce.rawValue])
+        payload.append(UInt8((ms >> 24) & 0xFF))
+        payload.append(UInt8((ms >> 16) & 0xFF))
+        payload.append(UInt8((ms >>  8) & 0xFF))
+        payload.append(UInt8( ms        & 0xFF))
+
+        // Cancel any stale pending continuation.
+        if let stale = responseContinuation {
+            responseContinuation = nil
+            expectedResponseTag = nil
+            stale.resume(throwing: SerialError.timeout)
+        }
+
+        let written = payload.withUnsafeBytes { buf in
+            write(fileDescriptor, buf.baseAddress!, buf.count)
+        }
+        guard written == payload.count else {
+            let err = String(cString: strerror(errno))
+            throw SerialError.writeFailed(err)
+        }
+
+        let tag = "ESC_DEBOUNCE"
+        NSLog("[SerialPort] TX: setEscDebounce %lu ms, expecting tag '%@'", UInt(ms), tag)
+
+        let response = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SerialResponse, Error>) in
+            self.expectedResponseTag = tag
+            self.responseContinuation = continuation
+
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(Self.responseTimeout * 1_000_000_000))
+                if let pending = self?.responseContinuation {
+                    self?.responseContinuation = nil
+                    self?.expectedResponseTag = nil
+                    pending.resume(throwing: SerialError.timeout)
+                }
+            }
+        }
+
+        if case .error(let msg) = response {
+            throw SerialError.deviceError(msg)
+        }
+        guard let confirmed = parseEscDebounceResponse(response) else {
+            throw SerialError.deviceError("Unexpected response")
+        }
+        return confirmed
+    }
+
+    /// Parses an `OK:ESC_DEBOUNCE:<ms>` response into a UInt32.
+    private func parseEscDebounceResponse(_ response: SerialResponse) -> UInt32? {
+        guard case .ok(let payload) = response,
+              payload.hasPrefix("ESC_DEBOUNCE:"),
+              let ms = UInt32(payload.dropFirst("ESC_DEBOUNCE:".count)) else {
+            return nil
+        }
+        return ms
     }
 
     /// Queries status with a single retry on timeout.
@@ -593,7 +683,12 @@ final class SerialPortService: ObservableObject {
             if let nonce = handshakeNonce, tag.hasPrefix("PING:") {
                 return payload == "PING:\(nonce)"
             }
-            return payload == tag
+            // For responses whose payload carries extra data (e.g. "ESC_DEBOUNCE:1500"),
+            // match by prefix so the tag acts as a namespace.
+            if payload.hasPrefix(tag + ":") || payload == tag {
+                return true
+            }
+            return false
         case .status:
             return tag == "STATUS"
         case .error:
@@ -623,12 +718,14 @@ final class SerialPortService: ObservableObject {
     /// Maps a command to the response tag we expect back from the ESP32.
     private func expectedTag(for command: SerialCommand) -> String {
         switch command {
-        case .brightnessUp:   return "UP"
-        case .brightnessDown: return "DOWN"
-        case .enterPairing:   return "PAIRING"
-        case .handshake:      return "PING"  // handshake uses sendHandshake() with nonce
-        case .getStatus:      return "STATUS"
-        case .unpair:         return "UNPAIRED"
+        case .brightnessUp:    return "UP"
+        case .brightnessDown:  return "DOWN"
+        case .enterPairing:    return "PAIRING"
+        case .handshake:       return "PING"  // handshake uses sendHandshake() with nonce
+        case .getStatus:       return "STATUS"
+        case .unpair:          return "UNPAIRED"
+        case .setEscDebounce:  return "ESC_DEBOUNCE"
+        case .getEscDebounce:  return "ESC_DEBOUNCE"
         }
     }
 

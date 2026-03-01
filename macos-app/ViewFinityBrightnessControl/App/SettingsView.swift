@@ -16,10 +16,13 @@ struct SettingsView: View {
     @State private var actionMessage: String?
     @State private var actionIsError: Bool = false
     @State private var screens: [(id: CGDirectDisplayID, name: String, type: ScreenType)] = []
+    @State private var escDebounceMs: Double = 2000
+    @State private var escDebouncePending: Bool = false
 
     private let logger = Logger(subsystem: "com.viewfinity.brightnesscontrol", category: "SettingsView")
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 0) {
             // Title bar
             HStack {
@@ -197,7 +200,7 @@ struct SettingsView: View {
 
             Spacer().frame(height: 12)
 
-            // Launch at Login
+            // Launch at Login + ESC Debounce
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader("General", icon: "gear")
@@ -208,6 +211,48 @@ struct SettingsView: View {
                         }
                         .toggleStyle(.switch)
                         .controlSize(.small)
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("OSD Dismiss Delay")
+                                .font(.caption)
+                            Spacer()
+                            Text("\(Int(escDebounceMs)) ms")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+
+                        Slider(
+                            value: $escDebounceMs,
+                            in: 200...10000,
+                            step: 100
+                        ) {
+                            EmptyView()
+                        } minimumValueLabel: {
+                            Text("200").font(.caption2).foregroundStyle(.tertiary)
+                        } maximumValueLabel: {
+                            Text("10s").font(.caption2).foregroundStyle(.tertiary)
+                        } onEditingChanged: { editing in
+                            if !editing {
+                                applyEscDebounce()
+                            }
+                        }
+                        .disabled(!serialPort.isConnected || escDebouncePending)
+
+                        Text("How long after the last brightness key press before the monitor OSD is dismissed.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if !serialPort.isConnected {
+                            Text("Connect to the ESP32 board to change this setting.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
                 .padding(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -238,12 +283,21 @@ struct SettingsView: View {
             }
         }
         .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        }
         .frame(width: 360)
+        .frame(maxHeight: .infinity, alignment: .top)
         .onAppear {
             refreshPorts()
             refreshScreens()
             selectedPort = serialPort.preferredPortPath ?? ""
             launchAtLogin = currentLaunchAtLoginState()
+            Task { await loadEscDebounce() }
+        }
+        .onChange(of: serialPort.isConnected) { connected in
+            if connected {
+                Task { await loadEscDebounce() }
+            }
         }
     }
 
@@ -361,6 +415,28 @@ struct SettingsView: View {
                 actionIsError = true
             }
             isUnpairing = false
+        }
+    }
+
+    // MARK: - ESC Debounce
+
+    private func loadEscDebounce() async {
+        guard let ms = await serialPort.getEscDebounce() else { return }
+        escDebounceMs = Double(ms)
+    }
+
+    private func applyEscDebounce() {
+        escDebouncePending = true
+        let ms = UInt32(escDebounceMs)
+        Task {
+            do {
+                let confirmed = try await serialPort.setEscDebounce(ms)
+                escDebounceMs = Double(confirmed)
+            } catch {
+                actionMessage = "Failed to set OSD dismiss delay: \(error.localizedDescription)"
+                actionIsError = true
+            }
+            escDebouncePending = false
         }
     }
 

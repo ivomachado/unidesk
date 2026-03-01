@@ -14,7 +14,7 @@ _(empty)_
 
 
 
-- **Crash when connecting from Settings window:** Investigate crash when pressing "Connect" in the Settings window. Likely a re-entrant `connect()` call or threading race. Guard against concurrent connection attempts.
+
 
 - **Remove `kiLog()` debug logger:** `kiLog()` in `KeyInterceptor.swift` writes every intercepted key event to `/tmp/keyinterceptor.log` (world-readable). Remove entirely or gate behind `#if DEBUG`.
 
@@ -31,12 +31,15 @@ _(empty)_
 - **Audit Unmanaged pointer lifetimes:** `passUnretained` in IOKit/CGEventTap callbacks could dangle. Add invalidation guards or switch to `passRetained`.
 
 ### Firmware
-
 _(empty)_
 
 ## Done
 
 - **Reconnect on brightness key press:** `BrightnessRouter.sendSerialBrightness` now calls `connect()` when disconnected before sending the command.
+- **Configurable ESC debounce:** Added `CMD_GET_ESC_DEBOUNCE` (0x08) / `CMD_SET_ESC_DEBOUNCE` (0x07) to the serial protocol. Firmware stores the value in NVS (`app_settings/esc_dbnc_ms`) and loads it on boot. macOS Settings view exposes a slider (200–10000 ms) in the General section; value is read from the board on connect and written back on slider release.
+- **Fix ESC debounce slider build error:** Moved `onEditingChanged` from an invalid view modifier to the correct trailing closure position in the `Slider` initializer (`label:minimumValueLabel:maximumValueLabel:onEditingChanged:`).
+- **Fix Settings window crash on Connect:** Replaced `NSHostingController` with `NSHostingView` as `contentView` to eliminate re-entrant `_postWindowNeedsUpdateConstraints` SIGABRT caused by `updateAnimatedWindowSize` during `@Published` property changes. Added `isConnecting` guard to prevent concurrent `connect()` calls.
+- **Fix firmware USB TX false failures:** `tinyusb_cdcacm_write_queue()` returns `size_t` (bytes written), not `esp_err_t`. The old code compared against `ESP_OK` (0), treating every successful write as failure and re-queuing duplicate data. Fixed return-value check in `send_response()`.
 
 ## Won't Do
 

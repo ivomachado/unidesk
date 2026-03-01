@@ -1,9 +1,11 @@
 #include "brightness_control.h"
 #include "ble_hid_service.h"
+#include "nvs_manager.h"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <algorithm>
 
 static const char *TAG = "BrightnessCtrl";
 
@@ -18,9 +20,11 @@ BrightnessControl& BrightnessControl::instance() {
 }
 
 BrightnessControl::BrightnessControl() {
+    esc_debounce_ms_ = NvsManager::get_esc_debounce_ms();
+
     esc_timer_ = xTimerCreate(
         "esc_debounce",
-        pdMS_TO_TICKS(ESC_DEBOUNCE_MS),
+        pdMS_TO_TICKS(esc_debounce_ms_),
         pdFALSE,  // one-shot
         this,
         &BrightnessControl::esc_timer_cb
@@ -96,10 +100,19 @@ bool BrightnessControl::send_brightness_report(uint16_t usage_code, const char *
         return false;
     }
 
-    ESP_LOGI(TAG, "[%s] Consumer report sent — scheduling deferred ESC dismiss (%dms)", direction, (int)ESC_DEBOUNCE_MS);
+    ESP_LOGI(TAG, "[%s] Consumer report sent — scheduling deferred ESC dismiss (%lu ms)", direction, (unsigned long)esc_debounce_ms_);
     schedule_esc_dismiss();
 
     return true;
+}
+
+void BrightnessControl::set_esc_debounce_ms(uint32_t ms) {
+    ms = std::max(NvsManager::ESC_DEBOUNCE_MIN_MS, std::min(NvsManager::ESC_DEBOUNCE_MAX_MS, ms));
+    esc_debounce_ms_ = ms;
+    if (esc_timer_) {
+        xTimerChangePeriod(esc_timer_, pdMS_TO_TICKS(ms), 0);
+    }
+    ESP_LOGI(TAG, "ESC debounce updated to %lu ms", (unsigned long)ms);
 }
 
 void BrightnessControl::schedule_esc_dismiss() {
