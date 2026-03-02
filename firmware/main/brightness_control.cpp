@@ -168,3 +168,23 @@ bool BrightnessControl::brightness_down() {
     ESP_LOGI(TAG, ">>> Brightness DOWN result: %s", result ? "SUCCESS" : "FAILED");
     return result;
 }
+
+/// Send an immediate ESC keyboard report (fire-and-forget).
+/// Returns true if BLE was connected and the keyboard report was sent.
+bool BrightnessControl::send_esc() {
+    // Notify the dedicated ESC task to perform the ESC send immediately.
+    // This ensures all BLE HID calls happen on the ESC task (the safe context).
+    if (esc_task_) {
+        // Cancel any pending debounce timer so we don't get a delayed duplicate.
+        if (esc_timer_) {
+            xTimerStop(esc_timer_, 0);
+        }
+        // Wake the esc task which will call send_esc_dismiss().
+        xTaskNotifyGive(esc_task_);
+        return true;
+    }
+
+    // Fallback: if there's no esc_task_ (unexpected), perform the send inline.
+    send_esc_dismiss();
+    return true;
+}

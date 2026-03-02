@@ -31,6 +31,7 @@ Commands are single bytes, except for the handshake which includes a nonce.
 | `0x06`                        | Unpair               | Clear BLE bond, disconnect if connected               |
 | `0x07` `<ms_hi>` `<ms_lo2>` `<ms_lo1>` `<ms_lo0>` | Set ESC Debounce | Set and persist the ESC dismiss debounce timeout (4 bytes, big-endian uint32, milliseconds; clamped to 200–10000) |
 | `0x08`                        | Get ESC Debounce     | Query the current ESC debounce timeout                |
+| `0x09`                        | ESC Key              | Send HID Keyboard ESC to the monitor (fire-and-forget — no response) |
 
 ### Set ESC Debounce Format
 
@@ -101,9 +102,22 @@ The macOS app reads bytes until `\n`, then parses:
 
 ## Stale Response Handling
 
-The ESP32 USB-CDC buffers data across sessions. When the macOS app reopens the port and sends the first byte, the ESP32 processes all previously buffered commands and floods back stale responses.
+The ESP32 USB-CDC buffers data across sessions. When the macOS app reopens the port and sends the first byte, the ESP32 may process and emit previously buffered responses from earlier sessions. Acting on those stale messages would be incorrect.
 
-The handshake nonce solves this: after opening the port, the app sends `0x04` with a random nonce and discards all incoming responses until it sees `OK:PING:<matching-nonce>`. No drain delays or timing heuristics are needed.
+The handshake nonce solves this: after opening the port the app sends `0x04` with a random nonce and discards incoming responses until it sees `OK:PING:<matching-nonce>`. No drain delays or timing heuristics are needed — the handshake ensures the host only acts on fresh messages for the current session.
+
+Unsolicited status messages (OSD)
+The firmware may emit unsolicited newline-terminated status messages at any time (for example `OK:OSD:1` when the monitor OSD becomes visible, and `OK:OSD:0` when it is hidden). When the serial port is open the macOS app continuously reads incoming lines, but by default the app correlates lines to outstanding requests and ignores unsolicited responses.
+
+To support OSD-driven behavior, the host must explicitly handle unsolicited `OK:OSD:1/0` messages and update local state (for example, a published `osdActive: Bool`). Important rules for correct behavior:
+
+- Only act on unsolicited OSD messages after the handshake completes for the current session, so stale buffered OSD flags are not applied. The handshake already provides this protection.
+- Treat `OK:OSD:1` / `OK:OSD:0` as fire-and-forget notifications from the firmware; they do not require a request from the host.
+- The macOS app should update a published flag (e.g. `osdActive`) when it receives these messages while connected.
+- `KeyInterceptor` (or `BrightnessRouter`) should consult `osdActive` and the active screen; if `osdActive == true` and the cursor is over the target monitor, the event tap may swallow the Esc event (return `nil`) to prevent local delivery.
+- Make this feature opt-in and gated by connection state; do not queue or persist OSD notifications while disconnected.
+
+This approach is feasible because the firmware already sends newline-terminated responses via USB-CDC and the host already reads them while the port is open; the only required change is to stop treating unsolicited lines as inert logs and instead parse and handle the `OSD` status messages.
 
 ---
 

@@ -201,6 +201,13 @@ void CommandHandler::dispatch_simple_command(uint8_t byte) {
             serial.send_response(buf);
             break;
         }
+        case CMD_ESC: {
+            ESP_LOGI(TAG, "CMD: ESC (BLE %s)", ble.is_connected() ? "connected" : "disconnected");
+            // Send the ESC HID report immediately via the existing brightness control path.
+            // This is fire-and-forget — no serial response is emitted.
+            BrightnessControl::instance().send_esc();
+            break;
+        }
         default: {
             ESP_LOGW(TAG, "Unknown command byte: 0x%02x -> ERR:UNKNOWN_CMD", byte);
             serial.send_response("ERR:UNKNOWN_CMD");

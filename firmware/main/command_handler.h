@@ -16,6 +16,8 @@ public:
     static constexpr uint8_t CMD_UNPAIR             = 0x06;
     static constexpr uint8_t CMD_SET_ESC_DEBOUNCE   = 0x07;
     static constexpr uint8_t CMD_GET_ESC_DEBOUNCE   = 0x08;
+    // ESC command: send a HID Keyboard ESC report immediately (fire-and-forget)
+    static constexpr uint8_t CMD_ESC                = 0x09;
 
     /// Sentinel byte posted to the RX queue by the read timeout timer callback.
     /// Must not collide with any valid command byte (max valid is 0x08).

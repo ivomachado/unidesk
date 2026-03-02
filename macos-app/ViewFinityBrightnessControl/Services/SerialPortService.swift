@@ -15,6 +15,7 @@ enum SerialCommand: UInt8 {
     case unpair            = 0x06
     case setEscDebounce    = 0x07
     case getEscDebounce    = 0x08
+    case esc               = 0x09
 }
 
 enum SerialResponse {
@@ -288,9 +289,21 @@ final class SerialPortService: ObservableObject {
         }
     }
 
+    /// Sends an ESC command to the ESP32 (fire-and-forget — no response expected).
+    /// Only sends when handshake/connection is established (isConnected == true).
+    /// If not connected, the ESC is dropped silently (no logs).
+    func sendESC() {
+        guard isConnected else { return }
+        do {
+            try sendFireAndForget(.esc)
+        } catch {
+            // Intentionally drop errors and do not log per feature spec.
+        }
+    }
+
     /// Writes a single-byte command without setting up a continuation or waiting
-    /// for a response. Used for brightness up/down which are fire-and-forget per
-    /// the serial protocol (the firmware sends no response for 0x01/0x02).
+    /// for a response. Used for brightness up/down and ESC which are fire-and-forget per
+    /// the serial protocol (the firmware sends no response for these commands).
     private func sendFireAndForget(_ command: SerialCommand) throws {
         guard fileDescriptor >= 0 else { throw SerialError.notConnected }
         var byte = command.rawValue
@@ -300,7 +313,8 @@ final class SerialPortService: ObservableObject {
             logger.error("write() failed: \(err)")
             throw SerialError.writeFailed(err)
         }
-        logger.debug("TX fire-and-forget: 0x\(String(format: "%02X", command.rawValue))")
+        let hex = String(format: "%02X", command.rawValue)
+        logger.debug("TX fire-and-forget: 0x\(hex)")
     }
 
     /// Instructs the ESP32 to enter BLE pairing mode (clears NVS and restarts advertising).
@@ -721,6 +735,7 @@ final class SerialPortService: ObservableObject {
         case .unpair:          return "UNPAIRED"
         case .setEscDebounce:  return "ESC_DEBOUNCE"
         case .getEscDebounce:  return "ESC_DEBOUNCE"
+        case .esc:             return "" // ESC is fire-and-forget, no response tag expected
         }
     }
 

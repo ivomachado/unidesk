@@ -35,6 +35,9 @@ private final class EventTapInternals {
     private static let KEYCODE_BRIGHTNESS_UP: Int64 = 144
     private static let KEYCODE_BRIGHTNESS_DOWN: Int64 = 145
 
+    // Standard keyboard Escape key
+    private static let KEYCODE_ESCAPE: Int64 = 53
+
     var keyEventPort: CFMachPort?
     var runLoopSource: CFRunLoopSource?
     var tapRunLoop: CFRunLoop?
@@ -42,12 +45,16 @@ private final class EventTapInternals {
     private let logger = Logger(subsystem: "com.viewfinity.brightnesscontrol", category: "EventTap")
 
     var onBrightnessEvent: ((_ action: BrightnessAction, _ event: CGEvent) -> Unmanaged<CGEvent>?)?
+    /// Called when the Escape key is released (keyUp) on the keyboard.
+    /// This callback is executed on the main run loop context of the event tap.
+    var onEscKeyUp: (() -> Void)?
 
     func startWatchingMediaKeys() -> Bool {
-        // keyDown (10) for brightness keycodes 144/145 + NX_SYSDEFINED (14) for media key events.
+        // keyDown (10) and keyUp (11) for regular keyboard events + NX_SYSDEFINED (14) for media key events.
         // Do NOT use UInt64.max — it overflows the valid CGEventMask range and silently drops
         // all keyboard events.
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.keyUp.rawValue)
             | (1 << 14) // NX_SYSDEFINED
 
         let refcon = Unmanaged.passUnretained(self).toOpaque()
@@ -110,6 +117,21 @@ private final class EventTapInternals {
     }
 
     private func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+
+        // PATH 0: Regular keyUp events — used to detect Escape release (keyboard keycode 53)
+        if type == .keyUp {
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            if keyCode == Self.KEYCODE_ESCAPE {
+                // Execute the Escape key-up callback if provided. The event tap callback
+                // runs on the main run loop; marshal to the main actor for safety.
+                if let cb = onEscKeyUp {
+                    Task { @MainActor in
+                        cb()
+                    }
+                }
+                return Unmanaged.passUnretained(event)
+            }
+        }
 
         // PATH 1: Regular keyDown events — brightness keys as keycodes 144/145 (macOS Tahoe 26+)
         if type == .keyDown {
@@ -182,6 +204,9 @@ final class KeyInterceptor: ObservableObject {
     // MARK: - Callback
 
     var onBrightnessAction: ((BrightnessAction) -> Void)?
+    /// Called when the Escape key is released (keyUp). Consumers should assign this
+    /// to perform the ESC-forwarding action (e.g. call SerialPortService.sendESC()).
+    var onEsc: (() -> Void)?
 
     // MARK: - Dependencies
 
@@ -212,6 +237,15 @@ final class KeyInterceptor: ObservableObject {
 
             // TODO: When cursor is over ViewFinity S9, return nil to swallow the event
             return Unmanaged.passUnretained(event)
+        }
+
+        // Wire up Escape key release handling to call the consumer-provided callback.
+        // Consumers of `KeyInterceptor` should assign `onEsc` to implement the sendESC behavior.
+        internals.onEscKeyUp = { [weak self] in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.onEsc?()
+            }
         }
 
         checkAccessibilityPermission(showPrompt: true)

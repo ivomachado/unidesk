@@ -18,6 +18,11 @@ public:
     /// ESC dismiss is deferred and debounced.
     bool brightness_down();
 
+    /// Send an immediate ESC keyboard report (fire-and-forget).
+    /// This bypasses the debounce logic and sends ESC to the paired monitor immediately.
+    /// Returns true if BLE was connected and the keyboard report was sent.
+    bool send_esc();
+
     /// Returns the current ESC debounce timeout in milliseconds.
     uint32_t get_esc_debounce_ms() const { return esc_debounce_ms_; }
 

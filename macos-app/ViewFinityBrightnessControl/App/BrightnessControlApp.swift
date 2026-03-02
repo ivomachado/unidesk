@@ -38,6 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyInterceptor.onBrightnessAction = { action in
             router.handleBrightness(action)
         }
+        // Forward Escape key releases to the ESP32 when available.
+        // SerialPortService enforces "send-if-connected, drop-otherwise".
+        keyInterceptor.onEsc = {
+            self.serialPort.sendESC()
+        }
         keyInterceptor.start(cursorMonitor: cursorMonitor)
 
         // Auto-connect to ESP32 in background
