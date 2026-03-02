@@ -174,13 +174,14 @@ Transfer via AirDrop, USB drive, or `scp`. On the destination Mac:
 
 1. Unzip the archive.
 2. Move the `.app` to `/Applications`.
-3. **Remove the quarantine attribute** (required since the app is not notarized):
+3. **If transferred via a method that sets quarantine** (Safari, Chrome, `curl`, Mail, Messages, or sometimes AirDrop), remove the quarantine attribute:
    ```sh
    xattr -cr /Applications/ViewFinity\ Brightness\ Control.app
    ```
+   Transfer methods like iCloud Drive, `scp`, `rsync`, USB drives, and NAS/SMB copies do **not** set quarantine, so this step can be skipped. Check with `xattr -l` on the `.app` if unsure.
 4. Launch and grant Accessibility permission.
 
-> **Note:** Without `xattr -cr`, macOS Gatekeeper will block the app with an "app is damaged" or "can't be opened" error. This is because the app is signed but not notarized — the quarantine flag triggers Gatekeeper's check on first launch.
+> **Note:** The `com.apple.quarantine` extended attribute triggers Gatekeeper's notarization check on first launch. Since the app is signed but not notarized, Gatekeeper will block it with a misleading "app is damaged" or "can't be opened" error. Removing the attribute with `xattr -cr` bypasses this check.
 
 ---
 
