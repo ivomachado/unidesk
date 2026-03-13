@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let screenResolver = ScreenResolver()
     let cursorMonitor: CursorMonitor
     let keyInterceptor = KeyInterceptor()
+    let audioOutputMonitor = AudioOutputMonitor()
     var brightnessRouter: BrightnessRouter?
 
     override init() {
@@ -38,12 +39,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyInterceptor.onBrightnessAction = { action in
             router.handleBrightness(action)
         }
+        // Forward volume key presses to the FiiO K11 R2R via ESP32.
+        // The swallow decision (isFiioActive) is handled inside KeyInterceptor
+        // synchronously — this callback only fires when swallowing.
+        keyInterceptor.onVolumeAction = { [weak self] action in
+            guard let self = self else { return false }
+            switch action {
+            case .up:   self.serialPort.fiioVolumeUp()
+            case .down: self.serialPort.fiioVolumeDown()
+            }
+            return true
+        }
         // Forward Escape key releases to the ESP32 when available.
         // SerialPortService enforces "send-if-connected, drop-otherwise".
         keyInterceptor.onEsc = {
             self.serialPort.sendESC()
         }
-        keyInterceptor.start(cursorMonitor: cursorMonitor)
+        keyInterceptor.start(cursorMonitor: cursorMonitor, audioOutputMonitor: audioOutputMonitor)
 
         // Auto-connect to ESP32 in background
         Task { @MainActor in
@@ -65,7 +77,8 @@ struct BrightnessControlApp: App {
                 serialPort: appDelegate.serialPort,
                 screenResolver: appDelegate.screenResolver,
                 cursorMonitor: appDelegate.cursorMonitor,
-                keyInterceptor: appDelegate.keyInterceptor
+                keyInterceptor: appDelegate.keyInterceptor,
+                audioOutputMonitor: appDelegate.audioOutputMonitor
             )
         } label: {
             MenuBarIcon(serialPort: appDelegate.serialPort)
@@ -108,7 +121,7 @@ final class SettingsWindowController {
 
     private var window: NSWindow?
 
-    func open(serialPort: SerialPortService, screenResolver: ScreenResolver) {
+    func open(serialPort: SerialPortService, screenResolver: ScreenResolver, audioOutputMonitor: AudioOutputMonitor) {
         // If the window already exists, just bring it to front.
         if let existing = window, existing.isVisible {
             existing.makeKeyAndOrderFront(nil)
@@ -118,7 +131,8 @@ final class SettingsWindowController {
 
         let settingsView = SettingsView(
             serialPort: serialPort,
-            screenResolver: screenResolver
+            screenResolver: screenResolver,
+            audioOutputMonitor: audioOutputMonitor
         )
 
         let newWindow = NSWindow(
@@ -158,6 +172,7 @@ struct MenuBarContentView: View {
     @ObservedObject var screenResolver: ScreenResolver
     @ObservedObject var cursorMonitor: CursorMonitor
     @ObservedObject var keyInterceptor: KeyInterceptor
+    @ObservedObject var audioOutputMonitor: AudioOutputMonitor
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -252,6 +267,22 @@ struct MenuBarContentView: View {
                     .buttonStyle(.borderless)
                 }
 
+                HStack(spacing: 12) {
+                    Button {
+                        serialPort.fiioVolumeDown()
+                    } label: {
+                        Label("Volume Down", systemImage: "speaker.minus")
+                    }
+                    .buttonStyle(.borderless)
+
+                    Button {
+                        serialPort.fiioVolumeUp()
+                    } label: {
+                        Label("Volume Up", systemImage: "speaker.plus")
+                    }
+                    .buttonStyle(.borderless)
+                }
+
                 if !serialPort.bleConnected {
                     Button {
                         Task { try? await serialPort.enterPairingMode() }
@@ -279,7 +310,8 @@ struct MenuBarContentView: View {
             Button {
                 SettingsWindowController.shared.open(
                     serialPort: serialPort,
-                    screenResolver: screenResolver
+                    screenResolver: screenResolver,
+                    audioOutputMonitor: audioOutputMonitor
                 )
             } label: {
                 Label("Settings…", systemImage: "gear")

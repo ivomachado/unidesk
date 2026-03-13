@@ -32,6 +32,8 @@ Commands are single bytes, except for the handshake which includes a nonce.
 | `0x07` `<ms_hi>` `<ms_lo2>` `<ms_lo1>` `<ms_lo0>` | Set ESC Debounce | Set and persist the ESC dismiss debounce timeout (4 bytes, big-endian uint32, milliseconds; clamped to 200–10000) |
 | `0x08`                        | Get ESC Debounce     | Query the current ESC debounce timeout                |
 | `0x09`                        | ESC Key              | Send HID Keyboard ESC to the monitor (fire-and-forget — no response) |
+| `0x0A`                        | FiiO Volume Up       | Send quadrature volume increment to the FiiO K11 R2R DAC (fire-and-forget — no response) |
+| `0x0B`                        | FiiO Volume Down     | Send quadrature volume decrement to the FiiO K11 R2R DAC (fire-and-forget — no response) |
 
 ### Set ESC Debounce Format
 
@@ -72,12 +74,15 @@ All responses are **newline-terminated ASCII strings** prefixed by a tag (`OK`, 
 | `OK:PING:<nonce>\n`                         | `0x04`        | Firmware is alive; `<nonce>` matches the hex string sent by host   |
 | _(none)_                                    | `0x01`        | Fire-and-forget — no response sent                                 |
 | _(none)_                                    | `0x02`        | Fire-and-forget — no response sent                                 |
+| _(none)_                                    | `0x09`        | Fire-and-forget — no response sent                                 |
+| _(none)_                                    | `0x0A`        | Fire-and-forget — no response sent                                 |
+| _(none)_                                    | `0x0B`        | Fire-and-forget — no response sent                                 |
 | `OK:PAIRING\n`                              | `0x03`        | NVS cleared, BLE advertising restarted in pairing mode             |
 | `OK:UNPAIRED\n`                             | `0x06`        | BLE bond cleared                                                   |
 | `STATUS:<connected\|disconnected>:<name>\n` | `0x05`        | BLE state and paired device name (empty string if none paired)     |
 | `OK:ESC_DEBOUNCE:<ms>\n`                    | `0x07`        | Confirms the new debounce value (clamped); `<ms>` is a decimal integer |
 | `OK:ESC_DEBOUNCE:<ms>\n`                    | `0x08`        | Current debounce timeout in milliseconds                           |
-| `ERR:<message>\n`                           | Any (except `0x01`, `0x02`) | Human-readable error                                |
+| `ERR:<message>\n`                           | Any (except `0x01`, `0x02`, `0x09`, `0x0A`, `0x0B`) | Human-readable error                                |
 
 ### Known Error Messages
 
@@ -137,7 +142,7 @@ This approach is feasible because the firmware already sends newline-terminated 
 2. **Open:** POSIX `open()` on the serial port, configure `termios`, assert DTR/RTS.
 3. **Handshake:** Send `0x04` + nonce + `\n`, wait for `OK:PING:<nonce>`.
 4. **Status query:** Send `0x05`, parse `STATUS:` response to get BLE state.
-5. **Normal operation:** Send `0x01`/`0x02` for brightness commands as needed.
+5. **Normal operation:** Send `0x01`/`0x02` for brightness, `0x0A`/`0x0B` for FiiO volume commands as needed.
 6. **Disconnect detection:** Read returns 0 or error → mark disconnected, attempt reconnect after delay.
 7. **Sleep/wake:** On `NSWorkspace.didWakeNotification`, close and reopen the port, re-handshake.
 8. **USB plug/unplug:** Detected via `IOServiceAddMatchingNotification` for automatic connect/disconnect.

@@ -18,9 +18,12 @@ public:
     static constexpr uint8_t CMD_GET_ESC_DEBOUNCE   = 0x08;
     // ESC command: send a HID Keyboard ESC report immediately (fire-and-forget)
     static constexpr uint8_t CMD_ESC                = 0x09;
+    // FiiO K11 R2R volume control via optocoupler-isolated GPIO quadrature signals
+    static constexpr uint8_t CMD_FIIO_VOLUME_UP     = 0x0A;
+    static constexpr uint8_t CMD_FIIO_VOLUME_DOWN   = 0x0B;
 
     /// Sentinel byte posted to the RX queue by the read timeout timer callback.
-    /// Must not collide with any valid command byte (max valid is 0x08).
+    /// Must not collide with any valid command byte (max valid is 0x0B).
     static constexpr uint8_t SENTINEL_TIMEOUT       = 0xFF;
 
     static CommandHandler& instance();

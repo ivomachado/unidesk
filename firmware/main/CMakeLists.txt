@@ -6,6 +6,7 @@ idf_component_register(
         "brightness_control.cpp"
         "usb_serial.cpp"
         "command_handler.cpp"
+        "fiio_control.cpp"
     INCLUDE_DIRS
         "."
 )

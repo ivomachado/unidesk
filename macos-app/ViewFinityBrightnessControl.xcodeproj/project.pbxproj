@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		01B46FDE597C2E956994B480 /* BrightnessControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA0B55DF740453FDE55E502 /* BrightnessControlApp.swift */; };
+		F2E1D0C9B8A7F6E5D4C3B2A1 /* AudioOutputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioOutputMonitor.swift */; };
 		052F784EB5F092029CC1B4C4 /* ScreenResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CDB7EDCA7E60F90833C89B6 /* ScreenResolver.swift */; };
 		71AA90CC27FEAA3E3DAB6B43 /* BrightnessRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F640722297F94E7AB0D43220 /* BrightnessRouter.swift */; };
 		7F693D74378E34062B4F3987 /* SerialPortService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3DF9850443EC5BDCC59A15 /* SerialPortService.swift */; };
@@ -18,6 +19,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioOutputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputMonitor.swift; sourceTree = "<group>"; };
 		0D08FC9E83DE6AB568F46417 /* KeyInterceptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyInterceptor.swift; sourceTree = "<group>"; };
 		2FC50081F4374EDB36B3CD8B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		4D3DF9850443EC5BDCC59A15 /* SerialPortService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortService.swift; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 		F75F9CBFD1E1A5C4D8928C28 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioOutputMonitor.swift */,
 				F640722297F94E7AB0D43220 /* BrightnessRouter.swift */,
 				57CA8F3691106678E67D31AB /* CursorMonitor.swift */,
 				0D08FC9E83DE6AB568F46417 /* KeyInterceptor.swift */,
@@ -142,6 +145,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F2E1D0C9B8A7F6E5D4C3B2A1 /* AudioOutputMonitor.swift in Sources */,
 				01B46FDE597C2E956994B480 /* BrightnessControlApp.swift in Sources */,
 				71AA90CC27FEAA3E3DAB6B43 /* BrightnessRouter.swift in Sources */,
 				B80F9CE97B89AF4B9B69D6B9 /* CursorMonitor.swift in Sources */,

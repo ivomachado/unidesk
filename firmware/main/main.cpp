@@ -2,6 +2,7 @@
 #include "ble_hid_service.h"
 #include "usb_serial.h"
 #include "command_handler.h"
+#include "fiio_control.h"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -21,7 +22,11 @@ extern "C" void app_main(void) {
     // 3. Start BLE advertising
     BleHidService::instance().start_advertising();
 
-    // 4. Initialize USB-CDC serial
+    // 4. Initialize FiiO K11 R2R volume control (GPIO init + FreeRTOS task).
+    //    Must happen before USB-CDC init so the task is ready when commands arrive.
+    FiiOControl::instance();
+
+    // 5. Initialize USB-CDC serial
     ESP_ERROR_CHECK(UsbSerial::instance().init());
 
     // 5. Wire USB serial → CommandHandler

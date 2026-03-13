@@ -16,6 +16,8 @@ enum SerialCommand: UInt8 {
     case setEscDebounce    = 0x07
     case getEscDebounce    = 0x08
     case esc               = 0x09
+    case fiioVolumeUp      = 0x0A
+    case fiioVolumeDown    = 0x0B
 }
 
 enum SerialResponse {
@@ -298,6 +300,28 @@ final class SerialPortService: ObservableObject {
             try sendFireAndForget(.esc)
         } catch {
             // Intentionally drop errors and do not log per feature spec.
+        }
+    }
+
+    /// Sends a FiiO volume-up command to the ESP32 (fire-and-forget — no response expected).
+    /// Only sends when connected; silently drops if disconnected.
+    func fiioVolumeUp() {
+        guard isConnected else { return }
+        do {
+            try sendFireAndForget(.fiioVolumeUp)
+        } catch {
+            logger.error("fiioVolumeUp failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Sends a FiiO volume-down command to the ESP32 (fire-and-forget — no response expected).
+    /// Only sends when connected; silently drops if disconnected.
+    func fiioVolumeDown() {
+        guard isConnected else { return }
+        do {
+            try sendFireAndForget(.fiioVolumeDown)
+        } catch {
+            logger.error("fiioVolumeDown failed: \(error.localizedDescription)")
         }
     }
 
@@ -736,6 +760,8 @@ final class SerialPortService: ObservableObject {
         case .setEscDebounce:  return "ESC_DEBOUNCE"
         case .getEscDebounce:  return "ESC_DEBOUNCE"
         case .esc:             return "" // ESC is fire-and-forget, no response tag expected
+        case .fiioVolumeUp:    return "" // fire-and-forget
+        case .fiioVolumeDown:  return "" // fire-and-forget
         }
     }
 

@@ -3,6 +3,7 @@
 #include "ble_hid_service.h"
 #include "nvs_manager.h"
 #include "usb_serial.h"
+#include "fiio_control.h"
 
 #include "esp_log.h"
 
@@ -206,6 +207,16 @@ void CommandHandler::dispatch_simple_command(uint8_t byte) {
             // Send the ESC HID report immediately via the existing brightness control path.
             // This is fire-and-forget — no serial response is emitted.
             BrightnessControl::instance().send_esc();
+            break;
+        }
+        case CMD_FIIO_VOLUME_UP: {
+            ESP_LOGI(TAG, "CMD: FiiO Volume Up");
+            FiiOControl::instance().volume_up();
+            break;
+        }
+        case CMD_FIIO_VOLUME_DOWN: {
+            ESP_LOGI(TAG, "CMD: FiiO Volume Down");
+            FiiOControl::instance().volume_down();
             break;
         }
         default: {

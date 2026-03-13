@@ -5,6 +5,7 @@ import os.log
 struct SettingsView: View {
     @ObservedObject var serialPort: SerialPortService
     @ObservedObject var screenResolver: ScreenResolver
+    @ObservedObject var audioOutputMonitor: AudioOutputMonitor
 
 
 
@@ -18,6 +19,8 @@ struct SettingsView: View {
     @State private var screens: [(id: CGDirectDisplayID, name: String, type: ScreenType)] = []
     @State private var escDebounceMs: Double = 2000
     @State private var escDebouncePending: Bool = false
+    @State private var fiioDeviceName: String = ""
+    @State private var audioOutputDevices: [(id: UInt32, name: String)] = []
 
     private let logger = Logger(subsystem: "com.viewfinity.brightnesscontrol", category: "SettingsView")
 
@@ -258,6 +261,62 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            Spacer().frame(height: 12)
+
+            // FiiO DAC Volume Routing Section
+            GroupBox {
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionHeader("FiiO DAC", icon: "speaker.wave.3")
+
+                    HStack {
+                        Text("Audio Output Device")
+                            .font(.caption)
+                        Spacer()
+                    }
+
+                    HStack {
+                        Picker("", selection: $fiioDeviceName) {
+                            Text("None (disabled)").tag("")
+                            ForEach(audioOutputDevices, id: \.id) { device in
+                                Text(device.name).tag(device.name)
+                            }
+                        }
+                        .labelsHidden()
+
+                        Button {
+                            refreshAudioDevices()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .help("Refresh audio output devices")
+                    }
+                    .onChange(of: fiioDeviceName) { newValue in
+                        UserDefaults.standard.set(newValue, forKey: AudioOutputMonitor.fiioDeviceNameKey)
+                        audioOutputMonitor.updateFiioActiveState()
+                    }
+
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(audioOutputMonitor.isFiioActive ? Color.green : Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text(audioOutputMonitor.isFiioActive
+                             ? "Active — volume keys route to FiiO"
+                             : fiioDeviceName.isEmpty
+                                ? "No device selected"
+                                : "Inactive — \(audioOutputMonitor.currentDeviceName) is current output")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("When the selected device is the active sound output, volume keys will control the FiiO K11 R2R via the ESP32 instead of macOS volume.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             // Action message banner
             if let message = actionMessage {
                 Spacer().frame(height: 12)
@@ -290,8 +349,10 @@ struct SettingsView: View {
         .onAppear {
             refreshPorts()
             refreshScreens()
+            refreshAudioDevices()
             selectedPort = serialPort.preferredPortPath ?? ""
             launchAtLogin = currentLaunchAtLoginState()
+            fiioDeviceName = UserDefaults.standard.string(forKey: AudioOutputMonitor.fiioDeviceNameKey) ?? ""
             Task { await loadEscDebounce() }
         }
         .onChange(of: serialPort.isConnected) { connected in
@@ -384,6 +445,10 @@ struct SettingsView: View {
     private func refreshScreens() {
         screenResolver.refresh()
         screens = screenResolver.allScreens()
+    }
+
+    private func refreshAudioDevices() {
+        audioOutputDevices = audioOutputMonitor.listOutputDevices()
     }
 
     private func performPairing() {

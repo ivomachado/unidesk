@@ -8,6 +8,14 @@ enum BrightnessAction {
     case down
 }
 
+/// Enumerates volume actions derived from media key events.
+/// Semantically distinct from `BrightnessAction` — routed to the FiiO K11 R2R
+/// DAC via optocoupler-isolated GPIO quadrature, not to display brightness.
+enum VolumeAction {
+    case up
+    case down
+}
+
 /// Describes the current Accessibility permission state.
 enum AccessibilityStatus: Equatable {
     case unknown
@@ -28,12 +36,23 @@ enum AccessibilityStatus: Equatable {
 private final class EventTapInternals {
 
     // NX constants for NX_SYSDEFINED media key events
+    private static let NX_KEYTYPE_SOUND_UP: Int = 0
+    private static let NX_KEYTYPE_SOUND_DOWN: Int = 1
     private static let NX_KEYTYPE_BRIGHTNESS_UP: Int = 2
     private static let NX_KEYTYPE_BRIGHTNESS_DOWN: Int = 3
 
     // Brightness keycodes used in keyDown events (macOS Tahoe 26+)
     private static let KEYCODE_BRIGHTNESS_UP: Int64 = 144
     private static let KEYCODE_BRIGHTNESS_DOWN: Int64 = 145
+
+    // Volume keycodes used in keyDown events (macOS Tahoe 26+)
+    private static let KEYCODE_VOLUME_UP: Int64 = 128
+    private static let KEYCODE_VOLUME_DOWN: Int64 = 129
+
+    // Traditional Carbon/HIToolbox volume keycodes (kVK_VolumeUp / kVK_VolumeDown).
+    // These may be used on pre-Tahoe systems or in keyUp events.
+    private static let KEYCODE_VOLUME_UP_LEGACY: Int64 = 0x48  // 72
+    private static let KEYCODE_VOLUME_DOWN_LEGACY: Int64 = 0x49  // 73
 
     // Standard keyboard Escape key
     private static let KEYCODE_ESCAPE: Int64 = 53
@@ -45,9 +64,16 @@ private final class EventTapInternals {
     private let logger = Logger(subsystem: "com.viewfinity.brightnesscontrol", category: "EventTap")
 
     var onBrightnessEvent: ((_ action: BrightnessAction, _ event: CGEvent) -> Unmanaged<CGEvent>?)?
+    /// Called when a volume key (NX_KEYTYPE_SOUND_UP/DOWN or Tahoe keycodes 128/129) is pressed.
+    /// Return nil to swallow the event, or Unmanaged.passUnretained(event) to let macOS handle it.
+    var onVolumeEvent: ((_ action: VolumeAction, _ event: CGEvent) -> Unmanaged<CGEvent>?)?
     /// Called when the Escape key is released (keyUp) on the keyboard.
     /// This callback is executed on the main run loop context of the event tap.
     var onEscKeyUp: (() -> Void)?
+
+    /// Synchronous check for whether volume events should be swallowed.
+    /// Used for key-up swallowing without firing actions.
+    var shouldSwallowVolume: (() -> Bool)?
 
     func startWatchingMediaKeys() -> Bool {
         // keyDown (10) and keyUp (11) for regular keyboard events + NX_SYSDEFINED (14) for media key events.
@@ -118,12 +144,12 @@ private final class EventTapInternals {
 
     private func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
 
-        // PATH 0: Regular keyUp events — used to detect Escape release (keyboard keycode 53)
+        // PATH 0: Regular keyUp events — Escape release + volume key-up swallowing.
+        // Volume key-ups MUST be swallowed when FiiO is active, otherwise macOS
+        // processes the volume change on key-up even if key-down was swallowed.
         if type == .keyUp {
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
             if keyCode == Self.KEYCODE_ESCAPE {
-                // Execute the Escape key-up callback if provided. The event tap callback
-                // runs on the main run loop; marshal to the main actor for safety.
                 if let cb = onEscKeyUp {
                     Task { @MainActor in
                         cb()
@@ -131,24 +157,39 @@ private final class EventTapInternals {
                 }
                 return Unmanaged.passUnretained(event)
             }
+            // Swallow volume key-ups when FiiO is the active output device.
+            // No action is fired — the action was already dispatched on key-down.
+            if keyCode == Self.KEYCODE_VOLUME_UP || keyCode == Self.KEYCODE_VOLUME_UP_LEGACY
+                || keyCode == Self.KEYCODE_VOLUME_DOWN || keyCode == Self.KEYCODE_VOLUME_DOWN_LEGACY
+            {
+                if shouldSwallowVolume?() == true {
+                    logger.debug("keyUp volume swallowed (keyCode=\(keyCode))")
+                    return nil
+                }
+            }
         }
 
-        // PATH 1: Regular keyDown events — brightness keys as keycodes 144/145 (macOS Tahoe 26+)
+        // PATH 1: Regular keyDown events — brightness keys as keycodes 144/145,
+        //          volume keys as keycodes 128/129 (macOS Tahoe 26+)
         if type == .keyDown {
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
-            let action: BrightnessAction
             switch keyCode {
             case Self.KEYCODE_BRIGHTNESS_UP:
-                action = .up
+                logger.debug("keyDown brightness UP (keyCode=\(keyCode))")
+                return onBrightnessEvent?(.up, event) ?? Unmanaged.passUnretained(event)
             case Self.KEYCODE_BRIGHTNESS_DOWN:
-                action = .down
+                logger.debug("keyDown brightness DOWN (keyCode=\(keyCode))")
+                return onBrightnessEvent?(.down, event) ?? Unmanaged.passUnretained(event)
+            case Self.KEYCODE_VOLUME_UP, Self.KEYCODE_VOLUME_UP_LEGACY:
+                logger.debug("keyDown volume UP (keyCode=\(keyCode))")
+                return onVolumeEvent?(.up, event) ?? Unmanaged.passUnretained(event)
+            case Self.KEYCODE_VOLUME_DOWN, Self.KEYCODE_VOLUME_DOWN_LEGACY:
+                logger.debug("keyDown volume DOWN (keyCode=\(keyCode))")
+                return onVolumeEvent?(.down, event) ?? Unmanaged.passUnretained(event)
             default:
                 return Unmanaged.passUnretained(event)
             }
-
-            logger.debug("keyDown brightness \(action == .up ? "UP" : "DOWN") (keyCode=\(keyCode))")
-            return onBrightnessEvent?(action, event) ?? Unmanaged.passUnretained(event)
         }
 
         // PATH 2: NX_SYSDEFINED events — traditional media-key path (pre-Tahoe)
@@ -170,22 +211,42 @@ private final class EventTapInternals {
         let flags = data1 & 0x0000FFFF
         let isKeyDown = (flags & 0xFF00) == 0x0A00
 
-        guard isKeyDown else {
-            return Unmanaged.passUnretained(event)
-        }
-
-        let action: BrightnessAction
         switch Int(keyCode) {
         case Self.NX_KEYTYPE_BRIGHTNESS_UP:
-            action = .up
+            guard isKeyDown else { return Unmanaged.passUnretained(event) }
+            logger.debug("NX_SYSDEFINED brightness UP (nxKeyType=\(keyCode))")
+            return onBrightnessEvent?(.up, event) ?? Unmanaged.passUnretained(event)
         case Self.NX_KEYTYPE_BRIGHTNESS_DOWN:
-            action = .down
+            guard isKeyDown else { return Unmanaged.passUnretained(event) }
+            logger.debug("NX_SYSDEFINED brightness DOWN (nxKeyType=\(keyCode))")
+            return onBrightnessEvent?(.down, event) ?? Unmanaged.passUnretained(event)
+        case Self.NX_KEYTYPE_SOUND_UP:
+            if isKeyDown {
+                logger.debug("NX_SYSDEFINED volume UP keyDown (nxKeyType=\(keyCode))")
+                return onVolumeEvent?(.up, event) ?? Unmanaged.passUnretained(event)
+            } else {
+                // Key-up: swallow without firing action to prevent macOS from
+                // processing the volume change on key-up.
+                if shouldSwallowVolume?() == true {
+                    logger.debug("NX_SYSDEFINED volume UP keyUp swallowed")
+                    return nil
+                }
+                return Unmanaged.passUnretained(event)
+            }
+        case Self.NX_KEYTYPE_SOUND_DOWN:
+            if isKeyDown {
+                logger.debug("NX_SYSDEFINED volume DOWN keyDown (nxKeyType=\(keyCode))")
+                return onVolumeEvent?(.down, event) ?? Unmanaged.passUnretained(event)
+            } else {
+                if shouldSwallowVolume?() == true {
+                    logger.debug("NX_SYSDEFINED volume DOWN keyUp swallowed")
+                    return nil
+                }
+                return Unmanaged.passUnretained(event)
+            }
         default:
             return Unmanaged.passUnretained(event)
         }
-
-        logger.debug("NX_SYSDEFINED brightness \(action == .up ? "UP" : "DOWN") (nxKeyType=\(keyCode))")
-        return onBrightnessEvent?(action, event) ?? Unmanaged.passUnretained(event)
     }
 }
 
@@ -204,6 +265,10 @@ final class KeyInterceptor: ObservableObject {
     // MARK: - Callback
 
     var onBrightnessAction: ((BrightnessAction) -> Void)?
+    /// Called when a volume key is pressed. The callback should return `true`
+    /// to swallow the event (preventing macOS from adjusting system volume),
+    /// or `false` to let it pass through.
+    var onVolumeAction: ((VolumeAction) -> Bool)?
     /// Called when the Escape key is released (keyUp). Consumers should assign this
     /// to perform the ESC-forwarding action (e.g. call SerialPortService.sendESC()).
     var onEsc: (() -> Void)?
@@ -211,6 +276,9 @@ final class KeyInterceptor: ObservableObject {
     // MARK: - Dependencies
 
     private var cursorMonitor: CursorMonitor?
+    /// Provides the thread-safe `isFiioActive` flag for the event tap callback
+    /// to decide synchronously whether to swallow volume key events.
+    private var audioOutputMonitor: AudioOutputMonitor?
 
     // MARK: - Private
 
@@ -220,8 +288,9 @@ final class KeyInterceptor: ObservableObject {
 
     // MARK: - Lifecycle
 
-    func start(cursorMonitor: CursorMonitor) {
+    func start(cursorMonitor: CursorMonitor, audioOutputMonitor: AudioOutputMonitor) {
         self.cursorMonitor = cursorMonitor
+        self.audioOutputMonitor = audioOutputMonitor
         guard !isMonitoring else {
             logger.debug("Already monitoring — ignoring duplicate start()")
             return
@@ -237,6 +306,31 @@ final class KeyInterceptor: ObservableObject {
 
             // TODO: When cursor is over ViewFinity S9, return nil to swallow the event
             return Unmanaged.passUnretained(event)
+        }
+
+        // Wire up volume key handling. The swallow decision must be synchronous
+        // (CGEventTap callback returns immediately), so we read the lock-protected
+        // `isFiioActive` flag from AudioOutputMonitor instead of actor-hopping.
+        let volumeLogger = Logger(subsystem: "com.viewfinity.brightnesscontrol", category: "VolumeIntercept")
+        internals.onVolumeEvent = { [weak self] action, event in
+            guard let self = self else { return Unmanaged.passUnretained(event) }
+
+            let shouldSwallow = self.audioOutputMonitor?.isFiioActiveSync ?? false
+            volumeLogger.debug("Volume event: action=\(String(describing: action)) isFiioActiveSync=\(shouldSwallow)")
+
+            if shouldSwallow {
+                Task { @MainActor in
+                    _ = self.onVolumeAction?(action)
+                }
+                return nil  // swallow — prevent macOS from adjusting system volume
+            }
+
+            return Unmanaged.passUnretained(event)  // pass through to macOS
+        }
+
+        // Synchronous swallow check for key-up events (no action dispatched).
+        internals.shouldSwallowVolume = { [weak self] in
+            self?.audioOutputMonitor?.isFiioActiveSync ?? false
         }
 
         // Wire up Escape key release handling to call the consumer-provided callback.
@@ -290,8 +384,8 @@ final class KeyInterceptor: ObservableObject {
             Task { @MainActor [weak self] in
                 self?.checkAccessibilityPermission(showPrompt: false)
                 if self?.permissionStatus == .granted, self?.isMonitoring == false {
-                    if let cm = self?.cursorMonitor {
-                        self?.start(cursorMonitor: cm)
+                    if let cm = self?.cursorMonitor, let aom = self?.audioOutputMonitor {
+                        self?.start(cursorMonitor: cm, audioOutputMonitor: aom)
                     }
                 }
             }
