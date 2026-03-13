@@ -16,5 +16,5 @@
 
 - Build and zip commands are in `README.md` under "Build" and "Transferring to Another Mac". Do not duplicate them here.
 - After building, **always verify code signing** with `codesign -dv` on the `.app`. Confirm `TeamIdentifier` is present (not `not set`) and `Signature` is not `adhoc`. An ad-hoc-signed release will lose Accessibility permission on every install.
-- The zip must be created from inside `build/Build/Products/Release/` so that the archive root is `ViewFinity Brightness Control.app/` — not a nested path. Extracting with a wrong root breaks `xattr -cr` and Gatekeeper.
+-- The zip must be created from inside `build/Build/Products/Release/` so that the archive root is `UniDesk.app/` — not a nested path. Extracting with a wrong root breaks `xattr -cr` and Gatekeeper.
 - On the destination Mac, `xattr -cr` is only needed if the `.app` has the `com.apple.quarantine` extended attribute. This attribute is added by **internet downloads** (Safari, Chrome, `curl`), Mail, Messages, and sometimes AirDrop. Transfer methods that **do not** set quarantine — iCloud Drive, `scp`, `rsync`, USB/NAS copy, or building locally — skip Gatekeeper entirely, so `xattr -cr` is unnecessary. Check with `xattr -l` on the `.app` if unsure.

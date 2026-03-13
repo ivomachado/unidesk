@@ -39,9 +39,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyInterceptor.onBrightnessAction = { action in
             router.handleBrightness(action)
         }
-        // Forward volume key presses to the FiiO K11 R2R via ESP32.
-        // The swallow decision (isFiioActive) is handled inside KeyInterceptor
-        // synchronously — this callback only fires when swallowing.
+        // Forward volume key presses to the ESP32 when appropriate.
+        // The swallow decision (should route to external device) is handled inside KeyInterceptor —
+        // this callback only fires when the key press should be routed away from macOS.
         keyInterceptor.onVolumeAction = { [weak self] action in
             guard let self = self else { return false }
             switch action {
@@ -154,7 +154,7 @@ final class SettingsWindowController {
         let hostingView = NSHostingView(rootView: settingsView)
         hostingView.autoresizingMask = [.width, .height]
         newWindow.contentView = hostingView
-        newWindow.title = "ViewFinity Brightness Control — Settings"
+        newWindow.title = "UniDesk — Settings"
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
         newWindow.level = .floating

@@ -15,7 +15,7 @@
 #include "freertos/task.h"
 
 static const char *TAG = "BleHidService";
-static const char *DEVICE_NAME = "VF9 Brightness Bridge";
+static const char *DEVICE_NAME = "UniDesk - Bridge";
 #define HID_APP_ID 0
 
 // UUIDs
@@ -61,8 +61,8 @@ static const uint8_t hid_info_val[] = {0x11, 0x01, 0x00, 0x02};
 static uint8_t protocol_mode_val = 1;
 static uint8_t hid_control_point_val = 0;
 static uint8_t battery_level_val = 100;
-static const char *manufacturer_name = "DIY";
-static const char *model_number = "VF9-BB-01";
+static const char *manufacturer_name = "UniDesk";
+static const char *model_number = "UniDesk-BB-01";
 static const uint8_t pnp_id_val[] = {0x02, 0x3A, 0x03, 0x01, 0x10, 0x01, 0x00};
 
 static uint8_t consumer_ccc_val[2] = {0x00, 0x00};

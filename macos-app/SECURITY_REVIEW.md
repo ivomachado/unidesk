@@ -1,7 +1,7 @@
 # macOS App Security Review
 
 **Date:** 2025-01-20
-**Scope:** macOS menu bar app (ViewFinity Brightness Control)
+**Scope:** macOS menu bar app (UniDesk)
 
 ---
 
@@ -52,7 +52,7 @@ The app runs completely unsandboxed. Combined with Accessibility permission (whi
 
 ### 🟡 M-03: Unnecessary JIT Entitlement
 
-**File:** `ViewFinityBrightnessControl.entitlements`
+**File:** `UniDesk.entitlements`
 
 ```xml
 <key>com.apple.security.cs.allow-jit</key>

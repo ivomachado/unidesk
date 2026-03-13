@@ -1,25 +1,26 @@
-# ViewFinity S9 Brightness Control
+# UniDesk
 
-A hardware-software bridge that lets you control the brightness of a Samsung ViewFinity S9 monitor using your Mac's brightness keys — just like a native display.
+UniDesk is a small macOS menu-bar utility plus ESP32‑S3 firmware that lets your Mac's brightness and volume keys control a Samsung ViewFinity S9 monitor as if it were a native display.
 
-When the cursor is on the ViewFinity S9, pressing brightness up/down sends commands through an ESP32-S3 microcontroller, which emulates a Bluetooth keyboard and adjusts the monitor's brightness via HID Consumer Control codes. When the cursor is on the MacBook's built-in display (or any natively compatible monitor), brightness keys work as usual through macOS.
+When the cursor is on the ViewFinity S9, brightness and volume key presses are routed through the macOS app to an ESP32‑S3 board over USB‑CDC. The board sends BLE HID Consumer Control reports to adjust brightness or volume on the monitor. When the cursor is on your Mac's built-in display (or a natively compatible monitor), macOS handles keys normally.
 
 ---
 
 ## How It Works
 
 ```
-┌──────────────┐    Brightness     ┌──────────────┐    USB-CDC     ┌──────────────┐    BLE HID     ┌──────────────┐
-│              │    key press       │              │    serial      │              │    Consumer    │              │
-│   MacBook    │ ─────────────────▶ │   macOS App  │ ────────────▶  │   ESP32-S3   │ ────────────▶  │ ViewFinity   │
-│   Keyboard   │                   │  (menu bar)  │   0x01/0x02   │  (firmware)  │    Control    │     S9       │
-│              │                   │              │               │              │   0x006F/70   │              │
-└──────────────┘                   └──────────────┘               └──────────────┘               └──────────────┘
+┌──────────────┐    Brightness/Volume    ┌──────────────┐    USB-CDC     ┌──────────────┐    BLE HID     ┌──────────────┐
+│              │    key press (brightness/volume) │              │    serial      │              │    Consumer    │              │
+│   MacBook    │ ───────────────────────────────▶ │   macOS App  │ ────────────▶  │   ESP32-S3   │ ────────────▶  │ ViewFinity   │
+│   Keyboard   │                                  │  (menu bar)  │   0x01/0x02 /  │  (firmware)  │    Control    │     S9       │
+│              │                                  │              │   0x0A/0x0B    │              │   brightness/ │              │
+│              │                                  │              │               │              │   volume HID  │              │
+└──────────────┘                                  └──────────────┘               └──────────────┘               └──────────────┘
 ```
 
 1. The **macOS menu bar app** intercepts brightness key presses via `CGEventTap` and tracks which display the cursor is on.
-2. If the cursor is over the **ViewFinity S9**, it sends a single-byte command (`0x01` = up, `0x02` = down) over USB serial to the ESP32-S3.
-3. The **ESP32-S3 firmware** receives the command and sends a BLE HID Consumer Control report (Brightness Increment/Decrement) to the monitor.
+2. If the cursor is over the **ViewFinity S9**, the macOS app sends a single-byte command over USB serial to the ESP32-S3.
+3. The **ESP32-S3 firmware** receives the command and sends the corresponding BLE HID Consumer Control report (Brightness Increment/Decrement or Volume Increment/Decrement) to the monitor.
 4. If the cursor is over the **built-in display** or a compatible external monitor, macOS handles brightness natively — the app doesn't interfere.
 
 ---
@@ -45,11 +46,11 @@ In daily use, only the **USB** port needs to be connected. The COM port is for d
 
 ### [macOS App](macos-app/README.md)
 
-A Swift/SwiftUI menu bar application that intercepts brightness keys, detects which display the cursor is on, and routes commands accordingly. Requires macOS 13+ and Accessibility permission.
+A Swift/SwiftUI menu bar application that intercepts brightness and volume keys, detects which display the cursor is on, and routes commands accordingly. Requires macOS 13+ and Accessibility permission.
 
 ### [ESP32-S3 Firmware](firmware/README.md)
 
-ESP-IDF firmware that receives brightness commands over USB-CDC serial and translates them into BLE HID reports. Handles bonding persistence, pairing management, and automatic reconnection to the monitor.
+ESP-IDF firmware that receives brightness and volume commands over USB-CDC serial and translates them into BLE HID reports. Handles bonding persistence, pairing management, and automatic reconnection to the monitor.
 
 ### [Serial Protocol](PROTOCOL.md)
 
@@ -79,7 +80,7 @@ xcodebuild -project ViewFinityBrightnessControl.xcodeproj \
   -derivedDataPath build clean build
 ```
 
-Copy `build/Build/Products/Release/ViewFinity Brightness Control.app` to `/Applications`.
+Copy `build/Build/Products/Release/UniDesk.app` to `/Applications` (Xcode's product name may still show the old name until you update the project settings; check the `Release` folder for the actual `.app` filename).
 
 See [macos-app/README.md](macos-app/README.md) for detailed build and installation instructions.
 
@@ -95,9 +96,14 @@ See [macos-app/README.md](macos-app/README.md) for detailed build and installati
 
 ## Multi-Mac Usage
 
-The pairing state lives entirely on the ESP32-S3's NVS (non-volatile storage). Move the board to any Mac with the app installed and it reconnects to the monitor automatically — no re-pairing needed.
+The pairing state lives entirely on the ESP32-S3's NVS (non-volatile storage). Move the board to any Mac with UniDesk installed and it reconnects to the monitor automatically — no re-pairing needed.
 
 ---
+
+## FiiO / External Audio Device Volume Control
+
+UniDesk also supports routing macOS volume key presses directly to Bluetooth audio devices and monitors that accept HID Consumer Control volume commands (for example certain FiiO devices and some Bluetooth-capable monitors). When paired through the ESP32-S3 bridge, UniDesk forwards standard Consumer Control Volume Up/Down HID reports (the firmware's FiiO quadrature commands are preserved in the serial protocol) so the target device's hardware volume is adjusted directly instead of changing the macOS system volume.
+
 
 ## License
 

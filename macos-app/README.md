@@ -1,6 +1,6 @@
-# macOS App — ViewFinity Brightness Control
+# macOS App — UniDesk
 
-A Swift/SwiftUI menu bar application that intercepts brightness key presses, detects which display the cursor is on, and routes brightness commands to the appropriate backend — either macOS native APIs for built-in displays, or the ESP32-S3 serial bridge for the Samsung ViewFinity S9.
+A Swift/SwiftUI menu bar application that intercepts brightness and volume key presses, detects which display the cursor is on, and routes brightness and volume commands to the appropriate backend — either macOS native APIs for built-in displays, or the ESP32-S3 serial bridge for the Samsung ViewFinity S9.
 
 ---
 
@@ -43,10 +43,10 @@ Manages the USB-CDC serial connection to the ESP32-S3:
 - **Discovery:** Enumerates `/dev/cu.usbmodem*` and matches VID `0x303A` / PID `0x4001` via IOKit.
 - **Connection:** POSIX `open()`, `termios` configuration, DTR/RTS assertion.
 - **Handshake:** Sends `0x04` + random nonce to verify firmware and discard stale buffered responses.
-- **Commands:** Sends single-byte brightness commands (`0x01` up, `0x02` down) and management commands (pair, unpair, status).
+  - **Commands:** Sends single-byte brightness commands (`0x01` up, `0x02` down), volume commands (`0x0A`/`0x0B` for FiiO volume), and management commands (pair, unpair, status).
 - **Auto-reconnect:** Detects USB plug/unplug via `IOServiceAddMatchingNotification` and re-connects after sleep/wake via `NSWorkspace.didWakeNotification`.
 
-See [PROTOCOL.md](../PROTOCOL.md) for the full serial protocol specification.
+See [PROTOCOL.md](../PROTOCOL.md) for the full serial protocol specification. UniDesk maps both brightness and (where applicable) volume keys to serial commands; consult `PROTOCOL.md` for FiiO-specific volume commands.
 
 **Threading model:** All service state (`fileDescriptor`, `readBuffer`, `responseContinuation`, `@Published` properties) lives on `@MainActor`, which eliminates data races without explicit locking. Serial **reads** happen on a background GCD queue via `DispatchSourceRead`; the handler parses raw bytes there and hops to `@MainActor` only to update state. Serial **writes** (`write()` syscalls) execute directly on the main thread. This is acceptable because commands are 1–7 bytes and the kernel USB-CDC buffer absorbs them in microseconds — main-thread blocking is unmeasurable. If the app ever needs bulk transfers or encounters a slow USB bus, writes should move to a dedicated `DispatchQueue` with synchronized `fileDescriptor` access.
 
@@ -129,7 +129,7 @@ ViewFinityBrightnessControl/
 ├── Models/
 │   └── ScreenType.swift                 # ScreenType enum
 ├── Info.plist
-└── ViewFinityBrightnessControl.entitlements
+  └── UniDesk.entitlements
 ```
 
 ---
@@ -144,7 +144,7 @@ xcodebuild -project ViewFinityBrightnessControl.xcodeproj \
   -derivedDataPath build clean build
 ```
 
-The built app is at `build/Build/Products/Release/ViewFinity Brightness Control.app`.
+The built app is at `build/Build/Products/Release/UniDesk.app` (or another `.app` filename depending on Xcode product settings — check the `Release` folder after building).
 
 ### Code Signing
 
@@ -156,7 +156,7 @@ A valid `DEVELOPMENT_TEAM` must be configured in the Xcode project.
 
 ## Install
 
-1. Copy `ViewFinity Brightness Control.app` to `/Applications`.
+1. Copy `UniDesk.app` (or the built `.app`) to `/Applications`.
 2. Launch the app.
 3. Grant **Accessibility** permission when prompted (System Settings → Privacy & Security → Accessibility).
 4. The app appears in the menu bar and auto-connects to the ESP32-S3 if plugged in.
@@ -167,7 +167,7 @@ Build and zip:
 
 ```sh
 cd build/Build/Products/Release
-zip -r ~/Desktop/ViewFinityBrightnessControl.zip "ViewFinity Brightness Control.app"
+zip -r ~/Desktop/UniDesk.zip "UniDesk.app"
 ```
 
 Transfer via AirDrop, USB drive, or `scp`. On the destination Mac:

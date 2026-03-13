@@ -26,7 +26,7 @@
 		57CA8F3691106678E67D31AB /* CursorMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorMonitor.swift; sourceTree = "<group>"; };
 		6B3F4F195670D9249C8B6536 /* ScreenType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenType.swift; sourceTree = "<group>"; };
 		8CDB7EDCA7E60F90833C89B6 /* ScreenResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenResolver.swift; sourceTree = "<group>"; };
-		AC3993A5E3C942EB8F5BD3ED /* ViewFinity Brightness Control.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ViewFinity Brightness Control.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "UniDesk.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DBA0B55DF740453FDE55E502 /* BrightnessControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessControlApp.swift; sourceTree = "<group>"; };
 		F640722297F94E7AB0D43220 /* BrightnessRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessRouter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -40,20 +40,20 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		34741B939D60655D5CF9D917 /* ViewFinityBrightnessControl */ = {
+		34741B939D60655D5CF9D917 /* UniDesk */ = {
 			isa = PBXGroup;
 			children = (
 				92FF87EE3DE444CF334EBD7E /* App */,
 				0C8F8BEB0C61A1BA6A082A43 /* Models */,
 				F75F9CBFD1E1A5C4D8928C28 /* Services */,
 			);
-			path = ViewFinityBrightnessControl;
+			path = UniDesk;
 			sourceTree = "<group>";
 		};
 		347A97BDB7756CC553646218 = {
 			isa = PBXGroup;
 			children = (
-				34741B939D60655D5CF9D917 /* ViewFinityBrightnessControl */,
+					34741B939D60655D5CF9D917 /* UniDesk */,
 				DC45C3667142A31A83A5706F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -70,7 +70,7 @@
 		DC45C3667142A31A83A5706F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				AC3993A5E3C942EB8F5BD3ED /* ViewFinity Brightness Control.app */,
+                AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -91,9 +91,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1B2E9B252E9AB2B84EE3B664 /* ViewFinityBrightnessControl */ = {
+			1B2E9B252E9AB2B84EE3B664 /* UniDesk */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4D7B9705B23F8C5DB6D8A6EC /* Build configuration list for PBXNativeTarget "ViewFinityBrightnessControl" */;
+            buildConfigurationList = 4D7B9705B23F8C5DB6D8A6EC /* Build configuration list for PBXNativeTarget "UniDesk" */;
 			buildPhases = (
 				39D89BB187E8B14719914CBE /* Sources */,
 			);
@@ -101,11 +101,11 @@
 			);
 			dependencies = (
 			);
-			name = ViewFinityBrightnessControl;
+				name = UniDesk;
 			packageProductDependencies = (
 			);
-			productName = ViewFinityBrightnessControl;
-			productReference = AC3993A5E3C942EB8F5BD3ED /* ViewFinity Brightness Control.app */;
+				productName = UniDesk;
+            productReference = AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -122,7 +122,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 785C2A84A4C6FEB220A6D99F /* Build configuration list for PBXProject "ViewFinityBrightnessControl" */;
+            buildConfigurationList = 785C2A84A4C6FEB220A6D99F /* Build configuration list for PBXProject "UniDesk" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -135,7 +135,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1B2E9B252E9AB2B84EE3B664 /* ViewFinityBrightnessControl */,
+					1B2E9B252E9AB2B84EE3B664 /* UniDesk */,
 			);
 		};
 /* End PBXProject section */
@@ -164,18 +164,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = ViewFinityBrightnessControl/ViewFinityBrightnessControl.entitlements;
+                CODE_SIGN_ENTITLEMENTS = UniDesk/UniDesk.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
-				INFOPLIST_FILE = ViewFinityBrightnessControl/Info.plist;
+                INFOPLIST_FILE = UniDesk/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.viewfinity.brightnesscontrol;
-				PRODUCT_NAME = "ViewFinity Brightness Control";
+                PRODUCT_BUNDLE_IDENTIFIER = com.ivomachado.unidesk;
+                PRODUCT_NAME = "UniDesk";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -184,18 +184,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = ViewFinityBrightnessControl/ViewFinityBrightnessControl.entitlements;
+                CODE_SIGN_ENTITLEMENTS = UniDesk/UniDesk.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
-				INFOPLIST_FILE = ViewFinityBrightnessControl/Info.plist;
+                INFOPLIST_FILE = UniDesk/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.viewfinity.brightnesscontrol;
-				PRODUCT_NAME = "ViewFinity Brightness Control";
+                PRODUCT_BUNDLE_IDENTIFIER = com.ivomachado.unidesk;
+                PRODUCT_NAME = "UniDesk";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -336,7 +336,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		4D7B9705B23F8C5DB6D8A6EC /* Build configuration list for PBXNativeTarget "ViewFinityBrightnessControl" */ = {
+		4D7B9705B23F8C5DB6D8A6EC /* Build configuration list for PBXNativeTarget "UniDesk" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				00E3FC152E92E274B8CA4897 /* Debug */,
@@ -345,7 +345,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		785C2A84A4C6FEB220A6D99F /* Build configuration list for PBXProject "ViewFinityBrightnessControl" */ = {
+		785C2A84A4C6FEB220A6D99F /* Build configuration list for PBXProject "UniDesk" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				371CF66147C137194B9CB3EF /* Debug */,

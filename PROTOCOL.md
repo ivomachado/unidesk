@@ -1,6 +1,7 @@
+
 # Serial Protocol
 
-Communication protocol between the macOS app and the ESP32-S3 firmware over USB-CDC serial.
+Communication protocol between the macOS app and the ESP32-S3 firmware over USB-CDC serial. This document describes the serial protocol used by UniDesk between the macOS app and the ESP32-S3 firmware. UniDesk maps both brightness and volume keys to serial commands — see the command table below. NOTE: protocol bytes remain unchanged.
 
 The ESP32-S3 appears as a CDC ACM device at `/dev/cu.usbmodem*` with VID `0x303A` (Espressif) and PID `0x4001`.
 

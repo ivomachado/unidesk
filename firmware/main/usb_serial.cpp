@@ -26,8 +26,8 @@ static const tusb_desc_device_t custom_device_descriptor = {
 
 static const char *custom_string_descriptors[] = {
     [0] = "",                          // Language (handled by TinyUSB)
-    [1] = "VF9 Project",              // Manufacturer
-    [2] = "VF9 Brightness Bridge",    // Product
+    [1] = "UniDesk",              // Manufacturer
+    [2] = "UniDesk - Bridge",    // Product
     [3] = "000001",                    // Serial number
 };
 

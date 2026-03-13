@@ -61,4 +61,4 @@ The original bug was entirely caused by using `UInt64.max` as a diagnostic "catc
 
 - `Services/KeyInterceptor.swift` — Fixed event mask, moved tap to main run loop
 - `Services/ScreenResolver.swift` — Added `NSScreen.localizedName` fallback, added `S27C9`/`S32C9` patterns
-- `ViewFinityBrightnessControl.entitlements` — Added `com.apple.security.cs.allow-jit`
+- `UniDesk.entitlements` — Added `com.apple.security.cs.allow-jit`

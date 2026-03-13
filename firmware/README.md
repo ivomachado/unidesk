@@ -1,6 +1,6 @@
-# ESP32-S3 Firmware — ViewFinity Brightness Bridge
+# ESP32-S3 Firmware — UniDesk Bridge
 
-ESP-IDF firmware that receives brightness commands over USB-CDC serial from the macOS app and translates them into BLE HID Consumer Control reports, adjusting the Samsung ViewFinity S9 monitor's brightness. After initial pairing, the board reconnects to the monitor automatically on power-up — no Mac involvement needed.
+ESP-IDF firmware that receives brightness and volume commands over USB-CDC serial from the macOS app and translates them into BLE HID Consumer Control reports, adjusting the Samsung ViewFinity S9 monitor's brightness or the attached audio device's volume. After initial pairing, the board reconnects to the monitor automatically on power-up — no Mac involvement needed.
 
 ---
 
