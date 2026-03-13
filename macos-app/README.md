@@ -116,7 +116,7 @@ SwiftUI settings window with:
 ## Project Structure
 
 ```
-ViewFinityBrightnessControl/
+UniDesk/
 ├── App/
 │   ├── BrightnessControlApp.swift       # @main, MenuBarExtra, AppDelegate
 │   └── SettingsView.swift               # Settings window
@@ -138,8 +138,8 @@ ViewFinityBrightnessControl/
 
 ```sh
 cd macos-app
-xcodebuild -project ViewFinityBrightnessControl.xcodeproj \
-  -scheme ViewFinityBrightnessControl \
+xcodebuild -project UniDesk.xcodeproj \
+  -scheme UniDesk \
   -configuration Release \
   -derivedDataPath build clean build
 ```
@@ -175,9 +175,9 @@ Transfer via AirDrop, USB drive, or `scp`. On the destination Mac:
 1. Unzip the archive.
 2. Move the `.app` to `/Applications`.
 3. **If transferred via a method that sets quarantine** (Safari, Chrome, `curl`, Mail, Messages, or sometimes AirDrop), remove the quarantine attribute:
-   ```sh
-   xattr -cr /Applications/ViewFinity\ Brightness\ Control.app
-   ```
+```sh
+xattr -cr /Applications/UniDesk.app
+```
    Transfer methods like iCloud Drive, `scp`, `rsync`, USB drives, and NAS/SMB copies do **not** set quarantine, so this step can be skipped. Check with `xattr -l` on the `.app` if unsure.
 4. Launch and grant Accessibility permission.
 

@@ -74,8 +74,8 @@ See [firmware/README.md](firmware/README.md) for detailed setup instructions.
 
 ```sh
 cd macos-app
-xcodebuild -project ViewFinityBrightnessControl.xcodeproj \
-  -scheme ViewFinityBrightnessControl \
+xcodebuild -project UniDesk.xcodeproj \
+  -scheme UniDesk \
   -configuration Release \
   -derivedDataPath build clean build
 ```
