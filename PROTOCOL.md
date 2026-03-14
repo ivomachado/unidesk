@@ -35,6 +35,7 @@ Commands are single bytes, except for the handshake which includes a nonce.
 | `0x09`                        | ESC Key              | Send HID Keyboard ESC to the monitor (fire-and-forget — no response) |
 | `0x0A`                        | FiiO Volume Up       | Send quadrature volume increment to the FiiO K11 R2R DAC (fire-and-forget — no response) |
 | `0x0B`                        | FiiO Volume Down     | Send quadrature volume decrement to the FiiO K11 R2R DAC (fire-and-forget — no response) |
+| `0x0C`                        | FiiO Toggle Output   | Double-click the FiiO power button to cycle the active output (fire-and-forget — no response) |
 
 ### Set ESC Debounce Format
 
@@ -78,12 +79,13 @@ All responses are **newline-terminated ASCII strings** prefixed by a tag (`OK`, 
 | _(none)_                                    | `0x09`        | Fire-and-forget — no response sent                                 |
 | _(none)_                                    | `0x0A`        | Fire-and-forget — no response sent                                 |
 | _(none)_                                    | `0x0B`        | Fire-and-forget — no response sent                                 |
+| _(none)_                                    | `0x0C`        | Fire-and-forget — no response sent                                 |
 | `OK:PAIRING\n`                              | `0x03`        | NVS cleared, BLE advertising restarted in pairing mode             |
 | `OK:UNPAIRED\n`                             | `0x06`        | BLE bond cleared                                                   |
 | `STATUS:<connected\|disconnected>:<name>\n` | `0x05`        | BLE state and paired device name (empty string if none paired)     |
 | `OK:ESC_DEBOUNCE:<ms>\n`                    | `0x07`        | Confirms the new debounce value (clamped); `<ms>` is a decimal integer |
 | `OK:ESC_DEBOUNCE:<ms>\n`                    | `0x08`        | Current debounce timeout in milliseconds                           |
-| `ERR:<message>\n`                           | Any (except `0x01`, `0x02`, `0x09`, `0x0A`, `0x0B`) | Human-readable error                                |
+| `ERR:<message>\n`                           | Any (except `0x01`, `0x02`, `0x09`, `0x0A`, `0x0B`, `0x0C`) | Human-readable error                                |
 
 ### Known Error Messages
 
