@@ -37,6 +37,11 @@ public:
     /// Logs a warning if the action queue is full.
     void volume_down();
 
+    /// Enqueue a power-button double-click to cycle the active output.
+    /// Returns immediately; the double-click sequence executes asynchronously on the fiio_ctrl task.
+    /// Logs a warning if the action queue is full.
+    void toggle_output();
+
 private:
     FiiOControl();
     ~FiiOControl();
@@ -45,7 +50,7 @@ private:
     FiiOControl(const FiiOControl&) = delete;
     FiiOControl& operator=(const FiiOControl&) = delete;
 
-    enum class Action : uint8_t { VOLUME_UP, VOLUME_DOWN };
+    enum class Action : uint8_t { VOLUME_UP, VOLUME_DOWN, TOGGLE_OUTPUT };
 
     /// FreeRTOS task entry point.
     static void task_fn(void* arg);
@@ -57,6 +62,10 @@ private:
     /// Execute the 4-step quadrature sequence for volume down.
     /// Runs on the fiio_ctrl task — safe to call vTaskDelay() here.
     void execute_volume_down();
+
+    /// Execute a double-click on the power button to cycle the active output.
+    /// Runs on the fiio_ctrl task — safe to call vTaskDelay() here.
+    void execute_toggle_output();
 
     QueueHandle_t action_queue_ = nullptr;
     TaskHandle_t  task_         = nullptr;
@@ -74,6 +83,11 @@ private:
     /// Delay between each of the 4 quadrature steps (milliseconds).
     /// Range: 10–20 ms. Increase if the FiiO MCU fails to register steps.
     static constexpr uint32_t STEP_INTERVAL_MS = 10;
+
+    /// Duration of each power-button press in the double-click sequence (milliseconds).
+    static constexpr uint32_t POWER_PRESS_MS   = 50;
+    /// Gap between the two power-button presses in the double-click sequence (milliseconds).
+    static constexpr uint32_t POWER_GAP_MS     = 100;
 
     // -------------------------------------------------------------------------
     // Task / queue sizing

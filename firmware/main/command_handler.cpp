@@ -219,6 +219,11 @@ void CommandHandler::dispatch_simple_command(uint8_t byte) {
             FiiOControl::instance().volume_down();
             break;
         }
+        case CMD_FIIO_TOGGLE_OUTPUT: {
+            ESP_LOGI(TAG, "CMD: FiiO Toggle Output");
+            FiiOControl::instance().toggle_output();
+            break;
+        }
         default: {
             ESP_LOGW(TAG, "Unknown command byte: 0x%02x -> ERR:UNKNOWN_CMD", byte);
             serial.send_response("ERR:UNKNOWN_CMD");

@@ -18,6 +18,7 @@ enum SerialCommand: UInt8 {
     case esc               = 0x09
     case fiioVolumeUp      = 0x0A
     case fiioVolumeDown    = 0x0B
+    case fiioToggleOutput  = 0x0C
 }
 
 enum SerialResponse {
@@ -322,6 +323,18 @@ final class SerialPortService: ObservableObject {
             try sendFireAndForget(.fiioVolumeDown)
         } catch {
             logger.error("fiioVolumeDown failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Sends a FiiO toggle-output command to the ESP32 (fire-and-forget — no response expected).
+    /// The firmware performs a double-click on the power button GPIO to cycle the active output.
+    /// Only sends when connected; silently drops if disconnected.
+    func fiioToggleOutput() {
+        guard isConnected else { return }
+        do {
+            try sendFireAndForget(.fiioToggleOutput)
+        } catch {
+            logger.error("fiioToggleOutput failed: \(error.localizedDescription)")
         }
     }
 
@@ -762,6 +775,7 @@ final class SerialPortService: ObservableObject {
         case .esc:             return "" // ESC is fire-and-forget, no response tag expected
         case .fiioVolumeUp:    return "" // fire-and-forget
         case .fiioVolumeDown:  return "" // fire-and-forget
+        case .fiioToggleOutput: return "" // fire-and-forget
         }
     }
 

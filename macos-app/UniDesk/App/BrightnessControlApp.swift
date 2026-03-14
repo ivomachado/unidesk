@@ -283,6 +283,13 @@ struct MenuBarContentView: View {
                     .buttonStyle(.borderless)
                 }
 
+                Button {
+                    serialPort.fiioToggleOutput()
+                } label: {
+                    Label("Toggle Output", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.borderless)
+
                 if !serialPort.bleConnected {
                     Button {
                         Task { try? await serialPort.enterPairingMode() }

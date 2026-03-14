@@ -91,6 +91,9 @@ void FiiOControl::task_fn(void* arg) {
                 case Action::VOLUME_DOWN:
                     self->execute_volume_down();
                     break;
+                case Action::TOGGLE_OUTPUT:
+                    self->execute_toggle_output();
+                    break;
             }
         }
     }
@@ -138,6 +141,30 @@ void FiiOControl::execute_volume_down() {
     ESP_LOGI(TAG, "Quadrature step DOWN complete");
 }
 
+// Power-button double-click to toggle active output:
+//   GPIO 14 HIGH (press) → wait POWER_PRESS_MS → GPIO 14 LOW (release)
+//   → wait POWER_GAP_MS →
+//   GPIO 14 HIGH (press) → wait POWER_PRESS_MS → GPIO 14 LOW (release)
+void FiiOControl::execute_toggle_output() {
+    ESP_LOGI(TAG, "Toggle output: double-click power button (press=%lu ms, gap=%lu ms)",
+             (unsigned long)POWER_PRESS_MS, (unsigned long)POWER_GAP_MS);
+
+    // First click
+    gpio_set_level(GPIO_POWER, 1);
+    vTaskDelay(pdMS_TO_TICKS(POWER_PRESS_MS));
+    gpio_set_level(GPIO_POWER, 0);
+
+    // Gap between clicks
+    vTaskDelay(pdMS_TO_TICKS(POWER_GAP_MS));
+
+    // Second click
+    gpio_set_level(GPIO_POWER, 1);
+    vTaskDelay(pdMS_TO_TICKS(POWER_PRESS_MS));
+    gpio_set_level(GPIO_POWER, 0);
+
+    ESP_LOGI(TAG, "Toggle output: double-click complete");
+}
+
 // -----------------------------------------------------------------------------
 // Public API — enqueue actions (non-blocking, safe from any task)
 // -----------------------------------------------------------------------------
@@ -161,5 +188,16 @@ void FiiOControl::volume_down() {
     Action action = Action::VOLUME_DOWN;
     if (xQueueSend(action_queue_, &action, 0) != pdTRUE) {
         ESP_LOGW(TAG, "volume_down: action queue full — command dropped");
+    }
+}
+
+void FiiOControl::toggle_output() {
+    if (!action_queue_) {
+        ESP_LOGE(TAG, "toggle_output: queue not initialised");
+        return;
+    }
+    Action action = Action::TOGGLE_OUTPUT;
+    if (xQueueSend(action_queue_, &action, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "toggle_output: action queue full — command dropped");
     }
 }
