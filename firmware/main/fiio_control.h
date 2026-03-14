@@ -85,7 +85,8 @@ private:
     static constexpr uint32_t STEP_INTERVAL_MS = 10;
 
     /// Duration of each power-button press in the double-click sequence (milliseconds).
-    static constexpr uint32_t POWER_PRESS_MS   = 50;
+    /// Per the PWR_ON pad spec: a standard button function pulse is 150 ms.
+    static constexpr uint32_t POWER_PRESS_MS   = 150;
     /// Gap between the two power-button presses in the double-click sequence (milliseconds).
     static constexpr uint32_t POWER_GAP_MS     = 100;
 

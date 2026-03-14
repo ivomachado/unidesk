@@ -24,7 +24,7 @@ _(empty)_
 
 ## Done
 
-- **FiiO K11 R2R output toggle:** Added `CMD_FIIO_TOGGLE_OUTPUT` (0x0C) to the serial protocol. Firmware executes a power-button double-click sequence on GPIO 14 (50 ms press, 100 ms gap, 50 ms press) to cycle the active output. macOS app exposes `fiioToggleOutput()` in `SerialPortService` and a "Toggle Output" button in the menu bar.
+- **FiiO K11 R2R output toggle:** Added `CMD_FIIO_TOGGLE_OUTPUT` (0x0C) to the serial protocol. Firmware executes a power-button double-click sequence on GPIO 14 (150 ms press, 100 ms gap, 150 ms press) to cycle the active output. macOS app exposes `fiioToggleOutput()` in `SerialPortService` and a "Toggle Output" button in the menu bar.
 
 - **FiiO K11 R2R DAC volume control (macOS app):** Added `AudioOutputMonitor` (CoreAudio default output device tracking), `VolumeAction` enum, volume key interception in `KeyInterceptor`, `SerialCommand.fiioVolumeUp`/`.fiioVolumeDown` (0x0A/0x0B), menu bar Volume Up/Down buttons, and FiiO DAC audio device picker in Settings. Volume keys are swallowed and routed to ESP32 when the current default audio output matches the configured FiiO device name.
 
