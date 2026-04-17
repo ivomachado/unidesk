@@ -85,6 +85,12 @@ final class SerialPortService: ObservableObject {
     private static let responseTimeout: TimeInterval = 5.0
     private static let reconnectDelay: TimeInterval = 2.0
 
+    /// Maximum number of handshake attempts on a single connect().
+    /// Through a USB hub the CDC TX endpoint may not be ready immediately,
+    /// so we retry with a short delay before giving up.
+    private static let handshakeMaxAttempts: Int = 3
+    private static let handshakeRetryDelay: UInt64 = 1_000_000_000  // 1 s
+
     // MARK: - Private State
 
     private let logger = Logger(subsystem: "com.viewfinity.brightnesscontrol", category: "SerialPort")
@@ -161,13 +167,13 @@ final class SerialPortService: ObservableObject {
 
     // MARK: - Public API
 
-    /// Lists all `/dev/cu.usbmodem*` ports currently present on the system.
+    /// Lists all `/dev/cu.usbmodem*` and `/dev/cu.usbserial*` ports currently present on the system.
     func availablePorts() -> [String] {
         let fm = FileManager.default
         do {
             let devContents = try fm.contentsOfDirectory(atPath: "/dev")
             return devContents
-                .filter { $0.hasPrefix("cu.usbmodem") }
+                .filter { $0.hasPrefix("cu.usbmodem") || $0.hasPrefix("cu.usbserial") }
                 .map { "/dev/\($0)" }
                 .sorted()
         } catch {
@@ -204,14 +210,22 @@ final class SerialPortService: ObservableObject {
             let msg = "No ESP32-S3 serial port found"
             logger.warning("\(msg)")
             lastError = msg
+            // If the modem port is missing, the board might be wedged.
+            // Nudging the UART port can bring it back.
+            nudgeAllUARTPorts()
             return
         }
 
         logger.info("Opening serial port: \(port)")
 
         guard openPort(port) else {
+            // If we can't even open the port, try nudging the hardware via UART
+            nudgeAllUARTPorts()
             return
         }
+
+        // Always nudge the board on every fresh open to ensure we're starting clean.
+        performHardwareReset()
 
         portPath = port
         startReading()
@@ -226,32 +240,63 @@ final class SerialPortService: ObservableObject {
         // Handshake — uses a random nonce so the app can instantly identify
         // the fresh response among stale OK:PING responses buffered from
         // previous sessions. No drain delays needed.
-        do {
-            let response = try await sendHandshake()
-            if case .ok(let payload) = response, payload.hasPrefix("PING:") {
-                logger.info("Handshake successful (nonce matched)")
-                handshakeFailed = false
-                isConnected = true
+        //
+        // Retry up to handshakeMaxAttempts times: through a USB hub (e.g. the
+        // ViewFinity S9's built-in hub) the CDC ACM TX endpoint may not be
+        // ready immediately.  tud_cdc_n_connected() can return false for
+        // several hundred milliseconds after DTR is asserted, causing
+        // send_response() to drop the PING reply silently.  Retrying with a
+        // short delay lets the endpoint finish negotiating without requiring a
+        // full disconnect/reconnect cycle.
+        var handshakeSucceeded = false
+        for attempt in 1...Self.handshakeMaxAttempts {
+            do {
+                let response = try await sendHandshake()
+                if case .ok(let payload) = response, payload.hasPrefix("PING:") {
+                    logger.info("Handshake successful on attempt \(attempt) (nonce matched)")
+                    handshakeFailed = false
+                    handshakeSucceeded = true
+                    isConnected = true
 
-                // Query status (with one retry on timeout)
-                await refreshStatusWithRetry()
-            } else {
-                logger.error("Unexpected handshake response: \(String(describing: response))")
+                    // Query status (with one retry on timeout)
+                    await refreshStatusWithRetry()
+                    break
+                } else {
+                    // Wrong firmware — no point retrying.
+                    logger.error("Unexpected handshake response: \(String(describing: response))")
+                    handshakeFailed = true
+                    lastError = "Board responded with an unexpected message — is the correct firmware flashed?"
+                    disconnectKeepError()
+                    return
+                }
+            } catch let error as SerialError where error == .timeout {
+                if attempt < Self.handshakeMaxAttempts {
+                    logger.warning("Handshake timed out (attempt \(attempt)/\(Self.handshakeMaxAttempts)) — retrying in 1 s")
+                    // Flush any partial data that arrived during the wait,
+                    // then give the CDC endpoint another moment to settle.
+                    readBuffer.removeAll()
+                    try? await Task.sleep(nanoseconds: Self.handshakeRetryDelay)
+                } else {
+                    logger.error("Handshake timed out after \(Self.handshakeMaxAttempts) attempts — performing hardware reset and nudging UART")
+                    lastError = "Board found but firmware did not respond — resetting board…"
+
+                    performHardwareReset()
+                    nudgeAllUARTPorts()
+
+                    // After hardware reset, we must disconnect and wait for the auto-reconnect cycle
+                    // to try with a fresh connection, as the board will have rebooted.
+                    disconnectKeepError()
+                    return
+                }
+            } catch {
+                logger.error("Handshake failed: \(error.localizedDescription)")
                 handshakeFailed = true
-                lastError = "Board responded with an unexpected message — is the correct firmware flashed?"
+                lastError = "Connection failed: \(error.localizedDescription)"
                 disconnectKeepError()
+                return
             }
-        } catch let error as SerialError where error == .timeout {
-            logger.error("Handshake timed out")
-            handshakeFailed = true
-            lastError = "Board found but firmware did not respond — is the correct firmware flashed?"
-            disconnectKeepError()
-        } catch {
-            logger.error("Handshake failed: \(error.localizedDescription)")
-            handshakeFailed = true
-            lastError = "Connection failed: \(error.localizedDescription)"
-            disconnectKeepError()
         }
+        _ = handshakeSucceeded  // suppress unused-variable warning
     }
 
     /// Disconnects from the serial port.
@@ -469,41 +514,46 @@ final class SerialPortService: ObservableObject {
 
     // MARK: - Port Discovery
 
-    /// Uses IOKit to find a `/dev/cu.usbmodem*` device matching the ESP32-S3 VID/PID.
+    /// Searches for an ESP32-S3 serial port (Native USB or UART).
+    /// Prioritizes Native USB (usbmodem) for the primary connection.
     private func discoverESP32Port() -> String? {
-        let matchingDict = IOServiceMatching(kIOSerialBSDServiceValue) as NSMutableDictionary
-        matchingDict[kIOSerialBSDTypeKey] = kIOSerialBSDModemType
+        // Search for both modem (Native USB) and UART (usbserial) types
+        let types = [kIOSerialBSDModemType, kIOSerialBSDRS232Type]
+        var candidates: [String] = []
 
-        var iterator: io_iterator_t = 0
-        let kr = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
-        guard kr == KERN_SUCCESS else {
-            logger.error("IOServiceGetMatchingServices failed: \(kr)")
-            return nil
-        }
-        defer { IOObjectRelease(iterator) }
+        for type in types {
+            let matchingDict = IOServiceMatching(kIOSerialBSDServiceValue) as NSMutableDictionary
+            matchingDict[kIOSerialBSDTypeKey] = type
 
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            defer {
+            var iterator: io_iterator_t = 0
+            let kr = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
+            guard kr == KERN_SUCCESS else { continue }
+
+            var service = IOIteratorNext(iterator)
+            while service != 0 {
+                if let pathCF = IORegistryEntryCreateCFProperty(
+                    service, kIOCalloutDeviceKey as CFString, kCFAllocatorDefault, 0
+                )?.takeRetainedValue() as? String {
+                    if matchesESP32VIDandPID(service: service) {
+                        candidates.append(pathCF)
+                    }
+                }
                 IOObjectRelease(service)
                 service = IOIteratorNext(iterator)
             }
+            IOObjectRelease(iterator)
+        }
 
-            // Get the callout device path (e.g. /dev/cu.usbmodemXXXX)
-            guard let pathCF = IORegistryEntryCreateCFProperty(
-                service,
-                kIOCalloutDeviceKey as CFString,
-                kCFAllocatorDefault,
-                0
-            )?.takeRetainedValue() as? String else {
-                continue
-            }
+        // Prioritize Native USB (usbmodem) for primary connection
+        if let modem = candidates.first(where: { $0.contains("cu.usbmodem") }) {
+            logger.info("Discovered ESP32-S3 Native USB at \(modem)")
+            return modem
+        }
 
-            // Walk up the registry to find USB VID/PID
-            if matchesESP32VIDandPID(service: service) {
-                logger.info("Discovered ESP32-S3 at \(pathCF)")
-                return pathCF
-            }
+        // Fallback to UART (usbserial)
+        if let uart = candidates.first(where: { $0.contains("cu.usbserial") }) {
+            logger.info("Discovered ESP32-S3 UART at \(uart)")
+            return uart
         }
 
         return nil
@@ -634,6 +684,10 @@ final class SerialPortService: ObservableObject {
                     self?.processIncomingData(data)
                 }
             } else if bytesRead == 0 || (bytesRead < 0 && errno != EAGAIN && errno != EINTR) {
+                // Critical: cancel the source immediately to stop the event flood.
+                // handlePortDisconnected will eventually null out readSource, but
+                // we need to stop it from firing NOW.
+                source.cancel()
                 Task { @MainActor [weak self] in
                     self?.handlePortDisconnected()
                 }
@@ -919,8 +973,8 @@ final class SerialPortService: ObservableObject {
                 guard let self else { return }
                 self.logger.info("System woke from sleep — reconnecting serial port")
                 self.disconnect()
-                // Brief delay to let USB enumerate
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                // Increased delay to let USB and IOKit stabilize
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
                 await self.connect()
             }
         }
@@ -929,8 +983,15 @@ final class SerialPortService: ObservableObject {
     // MARK: - USB Plug/Unplug Notifications (IOKit)
 
     private func setupUSBNotifications() {
-        let matchingDict = IOServiceMatching(kIOSerialBSDServiceValue) as NSMutableDictionary
-        matchingDict[kIOSerialBSDTypeKey] = kIOSerialBSDModemType
+        // Match specifically on the ESP32-S3 USB device by VID/PID so that
+        // notifications for other serial/modem devices (UART dongles, hubs, etc.)
+        // do not trigger spurious connect() / disconnect() calls.  Using
+        // IOUSBHostDevice matching with idVendor + idProduct is the correct
+        // approach — IOKit delivers one notification per matching USB device,
+        // not per serial interface, so we never get a flood of callbacks.
+        let matchingDict = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary
+        matchingDict["idVendor"]  = Self.espressifVID
+        matchingDict["idProduct"] = Self.esp32S3PID
 
         notificationPort = IONotificationPortCreate(kIOMainPortDefault)
         guard let notificationPort else {
@@ -962,7 +1023,7 @@ final class SerialPortService: ObservableObject {
                 }
                 Task { @MainActor in
                     if !service.isConnected {
-                        service.logger.info("USB serial device appeared — attempting connect")
+                        service.logger.info("ESP32-S3 USB device appeared — attempting connect")
                         try? await Task.sleep(nanoseconds: 500_000_000)
                         await service.connect()
                     }
@@ -989,7 +1050,7 @@ final class SerialPortService: ObservableObject {
                 }
                 Task { @MainActor in
                     if service.isConnected {
-                        service.logger.info("USB serial device removed")
+                        service.logger.info("ESP32-S3 USB device removed")
                         service.disconnect()
                     }
                 }
@@ -1007,6 +1068,66 @@ final class SerialPortService: ObservableObject {
             IONotificationPortDestroy(notificationPort)
             self.notificationPort = nil
         }
+    }
+
+    /// Performs the "magic" DTR/RTS sequence used by esptool to reset ESP32 boards.
+    /// This works on boards with the standard dual-transistor reset circuit.
+    private func performHardwareReset() {
+        guard fileDescriptor >= 0 else { return }
+        logger.info("Performing low-level hardware reset (DTR/RTS toggle)")
+
+        var modemBits: CInt = TIOCM_RTS
+
+        // 1. Set RTS (EN=0, Reset active) and Clear DTR (IO0=1)
+        _ = ioctl(fileDescriptor, TIOCCDTR)
+        _ = ioctl(fileDescriptor, TIOCMBIS, &modemBits)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // 2. Clear RTS (EN=1, Reset inactive) while DTR is still Clear (IO0=1)
+        // This ensures the chip reboots into NORMAL mode, not bootloader mode.
+        _ = ioctl(fileDescriptor, TIOCMBIC, &modemBits)
+
+        // 3. Finally set both to normal active state (usually both Set/Low)
+        Thread.sleep(forTimeInterval: 0.1)
+        _ = ioctl(fileDescriptor, TIOCSDTR)
+        _ = ioctl(fileDescriptor, TIOCMBIS, &modemBits)
+
+        logger.info("Hardware reset sequence complete")
+    }
+
+    /// Finds all available UART ports and performs a hardware reset toggle on each.
+    /// This is used to "kick" the board back to life via its physical reset circuit
+    /// when the Native USB (modem) port is stuck.
+    private func nudgeAllUARTPorts() {
+        let ports = availablePorts().filter { $0.contains("usbserial") }
+        guard !ports.isEmpty else { return }
+
+        logger.info("Attempting to nudge \(ports.count) UART port(s) to trigger hardware reset")
+
+        for port in ports {
+            let fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK)
+            guard fd >= 0 else { continue }
+
+            logger.info("Nudging UART port: \(port)")
+
+            var modemBits: CInt = TIOCM_RTS
+
+            // Step 1: EN=0 (Reset active), IO0=1 (Normal mode)
+            _ = ioctl(fd, TIOCCDTR)
+            _ = ioctl(fd, TIOCMBIS, &modemBits)
+            Thread.sleep(forTimeInterval: 0.1)
+
+            // Step 2: EN=1 (Normal boot)
+            _ = ioctl(fd, TIOCMBIC, &modemBits)
+            Thread.sleep(forTimeInterval: 0.1)
+
+            // Step 3: Normal state
+            _ = ioctl(fd, TIOCSDTR)
+            _ = ioctl(fd, TIOCMBIS, &modemBits)
+
+            close(fd)
+        }
+        logger.info("UART nudge complete")
     }
 
     private func drainIterator(_ iterator: io_iterator_t) {

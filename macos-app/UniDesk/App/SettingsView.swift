@@ -7,8 +7,6 @@ struct SettingsView: View {
     @ObservedObject var screenResolver: ScreenResolver
     @ObservedObject var audioOutputMonitor: AudioOutputMonitor
 
-
-
     @State private var availablePorts: [String] = []
     @State private var selectedPort: String = ""
     @State private var launchAtLogin: Bool = false
@@ -48,7 +46,6 @@ struct SettingsView: View {
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader("Serial Port", icon: "cable.connector")
-
 
                     HStack {
                         Picker("Port", selection: $selectedPort) {
@@ -116,7 +113,6 @@ struct SettingsView: View {
 
             Spacer().frame(height: 12)
 
-            // Serial Port Section
             // BLE Pairing Section
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
@@ -353,7 +349,9 @@ struct SettingsView: View {
             selectedPort = serialPort.preferredPortPath ?? ""
             launchAtLogin = currentLaunchAtLoginState()
             fiioDeviceName = UserDefaults.standard.string(forKey: AudioOutputMonitor.fiioDeviceNameKey) ?? ""
-            Task { await loadEscDebounce() }
+            if serialPort.isConnected {
+                Task { await loadEscDebounce() }
+            }
         }
         .onChange(of: serialPort.isConnected) { connected in
             if connected {

@@ -19,3 +19,4 @@
 - Do not duplicate information that is already discoverable by reading the code or existing documentation.
 - Do not add codebase overviews, directory structures, or tech stack descriptions to any `AGENTS.md` file. That belongs in `README.md`.
 - `AGENTS.md` files are for non-obvious gotchas, landmines, and workflow conventions only.
+- **Formatting:** Never leave trailing spaces on any lines, especially empty new lines.
