@@ -212,7 +212,7 @@ final class SerialPortService: ObservableObject {
             lastError = msg
             // If the modem port is missing, the board might be wedged.
             // Nudging the UART port can bring it back.
-            nudgeAllUARTPorts()
+            await nudgeAllUARTPorts()
             return
         }
 
@@ -220,12 +220,12 @@ final class SerialPortService: ObservableObject {
 
         guard openPort(port) else {
             // If we can't even open the port, try nudging the hardware via UART
-            nudgeAllUARTPorts()
+            await nudgeAllUARTPorts()
             return
         }
 
         // Always nudge the board on every fresh open to ensure we're starting clean.
-        performHardwareReset()
+        await performHardwareReset()
 
         portPath = port
         startReading()
@@ -280,8 +280,8 @@ final class SerialPortService: ObservableObject {
                     logger.error("Handshake timed out after \(Self.handshakeMaxAttempts) attempts — performing hardware reset and nudging UART")
                     lastError = "Board found but firmware did not respond — resetting board…"
 
-                    performHardwareReset()
-                    nudgeAllUARTPorts()
+                    await performHardwareReset()
+                    await nudgeAllUARTPorts()
 
                     // After hardware reset, we must disconnect and wait for the auto-reconnect cycle
                     // to try with a fresh connection, as the board will have rebooted.
@@ -1072,7 +1072,7 @@ final class SerialPortService: ObservableObject {
 
     /// Performs the "magic" DTR/RTS sequence used by esptool to reset ESP32 boards.
     /// This works on boards with the standard dual-transistor reset circuit.
-    private func performHardwareReset() {
+    private func performHardwareReset() async {
         guard fileDescriptor >= 0 else { return }
         logger.info("Performing low-level hardware reset (DTR/RTS toggle)")
 
@@ -1081,14 +1081,14 @@ final class SerialPortService: ObservableObject {
         // 1. Set RTS (EN=0, Reset active) and Clear DTR (IO0=1)
         _ = ioctl(fileDescriptor, TIOCCDTR)
         _ = ioctl(fileDescriptor, TIOCMBIS, &modemBits)
-        Thread.sleep(forTimeInterval: 0.1)
+        try? await Task.sleep(nanoseconds: 100_000_000)
 
         // 2. Clear RTS (EN=1, Reset inactive) while DTR is still Clear (IO0=1)
         // This ensures the chip reboots into NORMAL mode, not bootloader mode.
         _ = ioctl(fileDescriptor, TIOCMBIC, &modemBits)
 
         // 3. Finally set both to normal active state (usually both Set/Low)
-        Thread.sleep(forTimeInterval: 0.1)
+        try? await Task.sleep(nanoseconds: 100_000_000)
         _ = ioctl(fileDescriptor, TIOCSDTR)
         _ = ioctl(fileDescriptor, TIOCMBIS, &modemBits)
 
@@ -1098,7 +1098,7 @@ final class SerialPortService: ObservableObject {
     /// Finds all available UART ports and performs a hardware reset toggle on each.
     /// This is used to "kick" the board back to life via its physical reset circuit
     /// when the Native USB (modem) port is stuck.
-    private func nudgeAllUARTPorts() {
+    private func nudgeAllUARTPorts() async {
         let ports = availablePorts().filter { $0.contains("usbserial") }
         guard !ports.isEmpty else { return }
 
@@ -1115,11 +1115,11 @@ final class SerialPortService: ObservableObject {
             // Step 1: EN=0 (Reset active), IO0=1 (Normal mode)
             _ = ioctl(fd, TIOCCDTR)
             _ = ioctl(fd, TIOCMBIS, &modemBits)
-            Thread.sleep(forTimeInterval: 0.1)
+            try? await Task.sleep(nanoseconds: 100_000_000)
 
             // Step 2: EN=1 (Normal boot)
             _ = ioctl(fd, TIOCMBIC, &modemBits)
-            Thread.sleep(forTimeInterval: 0.1)
+            try? await Task.sleep(nanoseconds: 100_000_000)
 
             // Step 3: Normal state
             _ = ioctl(fd, TIOCSDTR)
