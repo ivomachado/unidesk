@@ -22,6 +22,16 @@ struct SettingsView: View {
 
     private let logger = Logger(subsystem: "com.viewfinity.brightnesscontrol", category: "SettingsView")
 
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        #if DEBUG
+        return "\(version) (\(build)) (Debug)"
+        #else
+        return "\(version) (\(build))"
+        #endif
+    }
+
     var body: some View {
         ScrollView {
         VStack(alignment: .leading, spacing: 0) {
@@ -336,6 +346,15 @@ struct SettingsView: View {
                         .fill(actionIsError ? Color.yellow.opacity(0.1) : Color.green.opacity(0.1))
                 )
             }
+
+            // Version Information
+            VStack(alignment: .leading, spacing: 4) {
+                Text("UniDesk v\(appVersion)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.top, 24)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)

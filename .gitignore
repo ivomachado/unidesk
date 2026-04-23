@@ -2,6 +2,7 @@
 
 # Build artifacts
 build/
+build-release/
 DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
