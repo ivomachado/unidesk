@@ -5,6 +5,7 @@ idf_component_register(
         "ble_hid_service.cpp"
         "brightness_control.cpp"
         "usb_serial.cpp"
+        "protocol_parser.cpp"
         "command_handler.cpp"
         "fiio_control.cpp"
     INCLUDE_DIRS

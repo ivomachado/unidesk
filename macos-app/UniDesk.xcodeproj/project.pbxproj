@@ -16,7 +16,21 @@
 		B80F9CE97B89AF4B9B69D6B9 /* CursorMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CA8F3691106678E67D31AB /* CursorMonitor.swift */; };
 		C35417F3730699CAD611BA90 /* ScreenType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B3F4F195670D9249C8B6536 /* ScreenType.swift */; };
 		C5ABB91B1688056BBFB8E33E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC50081F4374EDB36B3CD8B /* SettingsView.swift */; };
+		5894E3249A5C499FBB13AAB2 /* SerialResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63CE1B155CF46F39C694108 /* SerialResponseTests.swift */; };
+		0DC9D6BDA29E4F9BA328D40E /* ScreenTypeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 746BBC60AC194976B09335AC /* ScreenTypeTests.swift */; };
+		EBC9E549DE22413CB6CC8C9B /* ScreenResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 228A4F7A14E04429AB4B42F4 /* ScreenResolverTests.swift */; };
+		8B7B9B18B3C649F9A9A5BCE2 /* SerialPortServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA422AB0AF3E4DA38D2D55A6 /* SerialPortServiceTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1CB43688A7364A8B8D263E7F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AD74C0D9016E7DBE3FB82FB6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1B2E9B252E9AB2B84EE3B664;
+			remoteInfo = UniDesk;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioOutputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputMonitor.swift; sourceTree = "<group>"; };
@@ -26,9 +40,14 @@
 		57CA8F3691106678E67D31AB /* CursorMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorMonitor.swift; sourceTree = "<group>"; };
 		6B3F4F195670D9249C8B6536 /* ScreenType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenType.swift; sourceTree = "<group>"; };
 		8CDB7EDCA7E60F90833C89B6 /* ScreenResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenResolver.swift; sourceTree = "<group>"; };
-AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "UniDesk.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "UniDesk.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DBA0B55DF740453FDE55E502 /* BrightnessControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessControlApp.swift; sourceTree = "<group>"; };
 		F640722297F94E7AB0D43220 /* BrightnessRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessRouter.swift; sourceTree = "<group>"; };
+		977F617533BB4FF08F951190 /* UniDeskTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UniDeskTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D63CE1B155CF46F39C694108 /* SerialResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialResponseTests.swift; sourceTree = "<group>"; };
+		746BBC60AC194976B09335AC /* ScreenTypeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTypeTests.swift; sourceTree = "<group>"; };
+		228A4F7A14E04429AB4B42F4 /* ScreenResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenResolverTests.swift; sourceTree = "<group>"; };
+		EA422AB0AF3E4DA38D2D55A6 /* SerialPortServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -54,6 +73,7 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 			isa = PBXGroup;
 			children = (
 					34741B939D60655D5CF9D917 /* UniDesk */,
+				B3111FFF246146C9B5631EC6 /* UniDeskTests */,
 				DC45C3667142A31A83A5706F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -71,6 +91,7 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 			isa = PBXGroup;
 			children = (
                 AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */,
+				977F617533BB4FF08F951190 /* UniDeskTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -86,6 +107,17 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 				4D3DF9850443EC5BDCC59A15 /* SerialPortService.swift */,
 			);
 			path = Services;
+			sourceTree = "<group>";
+		};
+		B3111FFF246146C9B5631EC6 /* UniDeskTests */ = {
+			isa = PBXGroup;
+			children = (
+				D63CE1B155CF46F39C694108 /* SerialResponseTests.swift */,
+				746BBC60AC194976B09335AC /* ScreenTypeTests.swift */,
+				228A4F7A14E04429AB4B42F4 /* ScreenResolverTests.swift */,
+				EA422AB0AF3E4DA38D2D55A6 /* SerialPortServiceTests.swift */,
+			);
+			path = UniDeskTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -108,6 +140,22 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
             productReference = AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */;
 			productType = "com.apple.product-type.application";
 		};
+		88B0F59161C643B8A84E4D8A /* UniDeskTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D85E20DA86A4699BCBB8736 /* Build configuration list for PBXNativeTarget "UniDeskTests" */;
+			buildPhases = (
+				B8A06107F252490F817C7972 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F94702B9D43C43E8809B86CE /* PBXTargetDependency */,
+			);
+			name = UniDeskTests;
+			productName = UniDeskTests;
+			productReference = 977F617533BB4FF08F951190 /* UniDeskTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -119,6 +167,10 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 				TargetAttributes = {
 					1B2E9B252E9AB2B84EE3B664 = {
 						ProvisioningStyle = Automatic;
+					};
+					88B0F59161C643B8A84E4D8A = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 1B2E9B252E9AB2B84EE3B664;
 					};
 				};
 			};
@@ -136,6 +188,7 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 			projectRoot = "";
 			targets = (
 					1B2E9B252E9AB2B84EE3B664 /* UniDesk */,
+				88B0F59161C643B8A84E4D8A /* UniDeskTests */,
 			);
 		};
 /* End PBXProject section */
@@ -157,7 +210,26 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B8A06107F252490F817C7972 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5894E3249A5C499FBB13AAB2 /* SerialResponseTests.swift in Sources */,
+				0DC9D6BDA29E4F9BA328D40E /* ScreenTypeTests.swift in Sources */,
+				EBC9E549DE22413CB6CC8C9B /* ScreenResolverTests.swift in Sources */,
+				8B7B9B18B3C649F9A9A5BCE2 /* SerialPortServiceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F94702B9D43C43E8809B86CE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1B2E9B252E9AB2B84EE3B664 /* UniDesk */;
+			targetProxy = 1CB43688A7364A8B8D263E7F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		00E3FC152E92E274B8CA4897 /* Debug */ = {
@@ -333,6 +405,44 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 			};
 			name = Release;
 		};
+		58E53C51668C42DABB7881B0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2VR3GSRVVQ;
+				ENABLE_APP_SANDBOX = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ivomachado.unidesk.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/UniDesk.app/Contents/MacOS/UniDesk";
+			};
+			name = Debug;
+		};
+		C452EC1B9FD14AD4A0DFC469 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2VR3GSRVVQ;
+				ENABLE_APP_SANDBOX = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ivomachado.unidesk.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/UniDesk.app/Contents/MacOS/UniDesk";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -350,6 +460,15 @@ AC3993A5E3C942EB8F5BD3ED /* UniDesk.app */ = {isa = PBXFileReference; explicitFi
 			buildConfigurations = (
 				371CF66147C137194B9CB3EF /* Debug */,
 				6F13633F53475FBF7B856275 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8D85E20DA86A4699BCBB8736 /* Build configuration list for PBXNativeTarget "UniDeskTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				58E53C51668C42DABB7881B0 /* Debug */,
+				C452EC1B9FD14AD4A0DFC469 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

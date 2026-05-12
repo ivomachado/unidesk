@@ -18,6 +18,8 @@ _(empty)_
 
 - **Audit Unmanaged pointer lifetimes:** `passUnretained` in IOKit/CGEventTap callbacks could dangle. Add invalidation guards or switch to `passRetained`.
 
+- **DI refactoring for testability (macOS app):** `BrightnessRouter`, `CursorMonitor`, and `SerialPortService.connect()` cannot currently be unit-tested because they call IOKit, `NSEvent.mouseLocation`, and POSIX serial I/O directly. Introduce protocol abstractions (`DisplayService`, `CursorProvider`, `SerialTransport`) so these dependencies can be stubbed in tests — enabling coverage of routing logic, cursor→screen resolution, and the connect/handshake state machine without hardware.
+
 ### Firmware
 
 _(empty)_

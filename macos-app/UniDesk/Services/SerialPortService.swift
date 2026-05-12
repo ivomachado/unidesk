@@ -112,7 +112,7 @@ final class SerialPortService: ObservableObject {
     private var expectedResponseTag: String?
 
     /// The nonce sent with the current handshake, used to match `OK:PING:<nonce>`.
-    private var handshakeNonce: String?
+    var handshakeNonce: String?
 
     /// IOKit notification port and iterators for USB plug/unplug.
     private var notificationPort: IONotificationPortRef?
@@ -430,7 +430,7 @@ final class SerialPortService: ObservableObject {
         guard isConnected else { return nil }
         do {
             let response = try await sendCommand(.getEscDebounce)
-            return parseEscDebounceResponse(response)
+            return Self.parseEscDebounceResponse(response)
         } catch {
             logger.error("getEscDebounce failed: \(error.localizedDescription)")
             return nil
@@ -481,14 +481,14 @@ final class SerialPortService: ObservableObject {
         if case .error(let msg) = response {
             throw SerialError.deviceError(msg)
         }
-        guard let confirmed = parseEscDebounceResponse(response) else {
+        guard let confirmed = Self.parseEscDebounceResponse(response) else {
             throw SerialError.deviceError("Unexpected response")
         }
         return confirmed
     }
 
     /// Parses an `OK:ESC_DEBOUNCE:<ms>` response into a UInt32.
-    private func parseEscDebounceResponse(_ response: SerialResponse) -> UInt32? {
+    static func parseEscDebounceResponse(_ response: SerialResponse) -> UInt32? {
         guard case .ok(let payload) = response,
               payload.hasPrefix("ESC_DEBOUNCE:"),
               let ms = UInt32(payload.dropFirst("ESC_DEBOUNCE:".count)) else {
@@ -763,7 +763,7 @@ final class SerialPortService: ObservableObject {
     }
 
     /// Checks whether a response matches the expected tag for the pending command.
-    private func responseMatchesExpected(_ response: SerialResponse, tag: String) -> Bool {
+    func responseMatchesExpected(_ response: SerialResponse, tag: String) -> Bool {
         switch response {
         case .ok(let payload):
             // For handshake, match "PING:<nonce>" using the stored nonce.

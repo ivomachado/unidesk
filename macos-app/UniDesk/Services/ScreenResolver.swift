@@ -69,7 +69,7 @@ final class ScreenResolver: ObservableObject {
             }
         }
 
-        if isViewFinityS9(name: name) {
+        if Self.isViewFinityS9(name: name) {
             return .viewFinityS9
         }
 
@@ -111,7 +111,7 @@ final class ScreenResolver: ObservableObject {
         let key = String(displayID)
 
         if let type {
-            overrides[key] = encode(type)
+            overrides[key] = Self.encode(type)
         } else {
             overrides.removeValue(forKey: key)
         }
@@ -123,14 +123,14 @@ final class ScreenResolver: ObservableObject {
     private func userOverride(for displayID: CGDirectDisplayID) -> ScreenType? {
         let overrides = loadOverrides()
         guard let raw = overrides[String(displayID)] else { return nil }
-        return decode(raw)
+        return Self.decode(raw)
     }
 
     private func loadOverrides() -> [String: String] {
         UserDefaults.standard.dictionary(forKey: Self.overridesKey) as? [String: String] ?? [:]
     }
 
-    private func encode(_ type: ScreenType) -> String {
+    nonisolated static func encode(_ type: ScreenType) -> String {
         switch type {
         case .builtIn:      return "builtIn"
         case .compatible:   return "compatible"
@@ -139,7 +139,7 @@ final class ScreenResolver: ObservableObject {
         }
     }
 
-    private func decode(_ raw: String) -> ScreenType? {
+    nonisolated static func decode(_ raw: String) -> ScreenType? {
         switch raw {
         case "builtIn":      return .builtIn
         case "compatible":   return .compatible
@@ -176,11 +176,11 @@ final class ScreenResolver: ObservableObject {
         } ?? ""
     }
 
-    /// Checks whether the EDID model name matches known ViewFinity S9 patterns.
-    private func isViewFinityS9(name: String) -> Bool {
+    /// Checks whether a display model name matches known ViewFinity S9 patterns.
+    nonisolated static func isViewFinityS9(name: String) -> Bool {
         guard !name.isEmpty else { return false }
         let upper = name.uppercased()
-        return Self.viewFinityPatterns.contains { pattern in
+        return viewFinityPatterns.contains { pattern in
             upper.contains(pattern.uppercased())
         }
     }

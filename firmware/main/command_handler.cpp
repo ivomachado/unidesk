@@ -4,7 +4,6 @@
 #include "nvs_manager.h"
 #include "usb_serial.h"
 #include "fiio_control.h"
-
 #include "esp_log.h"
 
 static const char *TAG = "CommandHandler";
@@ -34,167 +33,91 @@ CommandHandler::~CommandHandler() {
 }
 
 // Timer callback — runs in the FreeRTOS timer daemon task.
-// To avoid racing with handle_byte() (which runs in usb_cmd_proc task),
-// we post a sentinel byte to the same RX queue instead of mutating state directly.
+// Posts a sentinel to the RX queue so all state mutations stay on usb_cmd_proc task.
 void CommandHandler::read_timeout_cb(TimerHandle_t timer) {
     ESP_LOGW(TAG, "Read timeout after %dms, posting sentinel to RX queue", (int)READ_TIMEOUT_MS);
     QueueHandle_t rx_queue = UsbSerial::instance().get_rx_queue();
     if (rx_queue) {
-        uint8_t sentinel = SENTINEL_TIMEOUT;
+        uint8_t sentinel = ProtocolParser::SENTINEL_TIMEOUT;
         xQueueSend(rx_queue, &sentinel, 0);
     }
 }
 
 void CommandHandler::handle_byte(uint8_t byte) {
-    ESP_LOGI(TAG, "Received byte: 0x%02x (state=%d)", byte, (int)state_);
+    ESP_LOGI(TAG, "Received byte: 0x%02x", byte);
 
-    switch (state_) {
-        case State::IDLE: {
-            // Ignore sentinel bytes that arrive when we're already idle
-            // (e.g. timer fired after state was already reset by normal completion)
-            if (byte == SENTINEL_TIMEOUT) {
-                ESP_LOGD(TAG, "Sentinel in IDLE state — ignoring");
-                break;
-            }
-            if (byte == CMD_PING) {
-                state_ = State::READING_NONCE;
-                nonce_buf_.clear();
-                if (read_timer_) {
-                    xTimerReset(read_timer_, 0);
-                }
-                ESP_LOGI(TAG, "CMD: Ping received, waiting for nonce...");
-            } else if (byte == CMD_SET_ESC_DEBOUNCE) {
-                state_ = State::READING_ESC_DEBOUNCE;
-                debounce_bytes_read_ = 0;
-                if (read_timer_) {
-                    xTimerReset(read_timer_, 0);
-                }
-                ESP_LOGI(TAG, "CMD: SetEscDebounce received, waiting for 4-byte value...");
-            } else {
-                dispatch_simple_command(byte);
-            }
-            break;
-        }
-        case State::READING_NONCE: {
-            if (byte == SENTINEL_TIMEOUT) {
-                ESP_LOGW(TAG, "Nonce read timed out, completing ping without nonce");
-                nonce_buf_.clear();
-                complete_ping();
-            } else if (byte == '\n') {
-                if (read_timer_) {
-                    xTimerStop(read_timer_, 0);
-                }
-                ESP_LOGI(TAG, "Nonce complete: \"%s\"", nonce_buf_.c_str());
-                complete_ping();
-            } else if (nonce_buf_.size() < MAX_NONCE_LEN) {
-                nonce_buf_ += (char)byte;
-            } else {
-                ESP_LOGW(TAG, "Nonce exceeded max length (%d), completing", (int)MAX_NONCE_LEN);
-                if (read_timer_) {
-                    xTimerStop(read_timer_, 0);
-                }
-                complete_ping();
-            }
-            break;
-        }
-        case State::READING_ESC_DEBOUNCE: {
-            if (byte == SENTINEL_TIMEOUT) {
-                ESP_LOGW(TAG, "ESC debounce read timed out after %d byte(s), resetting", debounce_bytes_read_);
-                state_ = State::IDLE;
-                debounce_bytes_read_ = 0;
-                UsbSerial::instance().send_response("ERR:TIMEOUT");
-            } else {
-                debounce_buf_[debounce_bytes_read_++] = byte;
-                if (debounce_bytes_read_ == 4) {
-                    if (read_timer_) {
-                        xTimerStop(read_timer_, 0);
-                    }
-                    complete_set_esc_debounce();
-                }
-            }
-            break;
-        }
+    ParseResult pr = parser_.handle_byte(byte);
+
+    if (pr.start_timeout && read_timer_) {
+        xTimerReset(read_timer_, 0);
+    } else if (pr.stop_timeout && read_timer_) {
+        xTimerStop(read_timer_, 0);
+    }
+
+    if (pr.command.type != ParsedCommand::Type::None) {
+        dispatch(pr.command);
     }
 }
 
-void CommandHandler::complete_ping() {
+void CommandHandler::dispatch(const ParsedCommand& cmd) {
     auto &serial = UsbSerial::instance();
-    state_ = State::IDLE;
+    auto &ble    = BleHidService::instance();
 
-    if (nonce_buf_.empty()) {
-        ESP_LOGI(TAG, "CMD: Ping -> OK:PING (no nonce)");
-        serial.send_response("OK:PING");
-    } else {
-        std::string response = "OK:PING:" + nonce_buf_;
-        ESP_LOGI(TAG, "CMD: Ping -> %s", response.c_str());
-        serial.send_response(response);
-    }
-    nonce_buf_.clear();
-}
-
-void CommandHandler::complete_set_esc_debounce() {
-    auto &serial = UsbSerial::instance();
-    state_ = State::IDLE;
-
-    // Big-endian decode
-    uint32_t ms = ((uint32_t)debounce_buf_[0] << 24)
-                | ((uint32_t)debounce_buf_[1] << 16)
-                | ((uint32_t)debounce_buf_[2] <<  8)
-                |  (uint32_t)debounce_buf_[3];
-
-    ESP_LOGI(TAG, "CMD: SetEscDebounce %lu ms", (unsigned long)ms);
-
-    auto &bc = BrightnessControl::instance();
-    bc.set_esc_debounce_ms(ms);
-
-    esp_err_t err = NvsManager::set_esc_debounce_ms(bc.get_esc_debounce_ms());
-    if (err == ESP_OK) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "OK:ESC_DEBOUNCE:%lu", (unsigned long)bc.get_esc_debounce_ms());
-        serial.send_response(buf);
-    } else {
-        serial.send_response("ERR:NVS_WRITE_FAILED");
-    }
-}
-
-void CommandHandler::dispatch_simple_command(uint8_t byte) {
-    auto &serial = UsbSerial::instance();
-    auto &ble = BleHidService::instance();
-
-    switch (byte) {
-        case CMD_BRIGHTNESS_UP: {
+    switch (cmd.type) {
+        case ParsedCommand::Type::BrightnessUp:
             ESP_LOGI(TAG, "CMD: Brightness Up (BLE %s)", ble.is_connected() ? "connected" : "disconnected");
             BrightnessControl::instance().brightness_up();
             break;
-        }
-        case CMD_BRIGHTNESS_DOWN: {
+
+        case ParsedCommand::Type::BrightnessDown:
             ESP_LOGI(TAG, "CMD: Brightness Down (BLE %s)", ble.is_connected() ? "connected" : "disconnected");
             BrightnessControl::instance().brightness_down();
             break;
-        }
-        case CMD_PAIRING_MODE: {
-            ESP_LOGI(TAG, "CMD: Enter Pairing Mode");
+
+        case ParsedCommand::Type::PairingMode:
+            ESP_LOGI(TAG, "CMD: Enter Pairing Mode -> OK:PAIRING");
             ble.enter_pairing_mode();
-            ESP_LOGI(TAG, "-> OK:PAIRING");
             serial.send_response("OK:PAIRING");
             break;
+
+        case ParsedCommand::Type::Ping: {
+            std::string response = cmd.str_payload.empty()
+                ? "OK:PING"
+                : "OK:PING:" + cmd.str_payload;
+            ESP_LOGI(TAG, "CMD: Ping -> %s", response.c_str());
+            serial.send_response(response);
+            break;
         }
-        case CMD_STATUS: {
+
+        case ParsedCommand::Type::Status: {
             std::string state = ble.is_connected() ? "connected" : "disconnected";
-            std::string name = ble.get_peer_name();
-            std::string response = "STATUS:" + state + ":" + name;
+            std::string response = "STATUS:" + state + ":" + ble.get_peer_name();
             ESP_LOGI(TAG, "CMD: Get Status -> %s", response.c_str());
             serial.send_response(response);
             break;
         }
-        case CMD_UNPAIR: {
-            ESP_LOGI(TAG, "CMD: Unpair");
+
+        case ParsedCommand::Type::Unpair:
+            ESP_LOGI(TAG, "CMD: Unpair -> OK:UNPAIRED");
             ble.unpair();
-            ESP_LOGI(TAG, "-> OK:UNPAIRED");
             serial.send_response("OK:UNPAIRED");
             break;
+
+        case ParsedCommand::Type::SetEscDebounce: {
+            auto &bc = BrightnessControl::instance();
+            bc.set_esc_debounce_ms(cmd.uint_payload);
+            esp_err_t err = NvsManager::set_esc_debounce_ms(bc.get_esc_debounce_ms());
+            if (err == ESP_OK) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "OK:ESC_DEBOUNCE:%lu", (unsigned long)bc.get_esc_debounce_ms());
+                serial.send_response(buf);
+            } else {
+                serial.send_response("ERR:NVS_WRITE_FAILED");
+            }
+            break;
         }
-        case CMD_GET_ESC_DEBOUNCE: {
+
+        case ParsedCommand::Type::GetEscDebounce: {
             uint32_t ms = BrightnessControl::instance().get_esc_debounce_ms();
             char buf[32];
             snprintf(buf, sizeof(buf), "OK:ESC_DEBOUNCE:%lu", (unsigned long)ms);
@@ -202,27 +125,28 @@ void CommandHandler::dispatch_simple_command(uint8_t byte) {
             serial.send_response(buf);
             break;
         }
-        case CMD_ESC: {
+
+        case ParsedCommand::Type::Esc:
             ESP_LOGI(TAG, "CMD: ESC (BLE %s)", ble.is_connected() ? "connected" : "disconnected");
-            // Send the ESC HID report immediately via the existing brightness control path.
-            // This is fire-and-forget — no serial response is emitted.
             BrightnessControl::instance().send_esc();
             break;
-        }
-        case CMD_FIIO_VOLUME_UP: {
+
+        case ParsedCommand::Type::FiiOVolumeUp:
             ESP_LOGI(TAG, "CMD: FiiO Volume Up");
             FiiOControl::instance().volume_up();
             break;
-        }
-        case CMD_FIIO_VOLUME_DOWN: {
+
+        case ParsedCommand::Type::FiiOVolumeDown:
             ESP_LOGI(TAG, "CMD: FiiO Volume Down");
             FiiOControl::instance().volume_down();
             break;
-        }
-        default: {
-            ESP_LOGW(TAG, "Unknown command byte: 0x%02x -> ERR:UNKNOWN_CMD", byte);
-            serial.send_response("ERR:UNKNOWN_CMD");
+
+        case ParsedCommand::Type::Error:
+            ESP_LOGW(TAG, "Protocol error: %s -> ERR:%s", cmd.str_payload.c_str(), cmd.str_payload.c_str());
+            serial.send_response("ERR:" + cmd.str_payload);
             break;
-        }
+
+        case ParsedCommand::Type::None:
+            break;
     }
 }
